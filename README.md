@@ -41,21 +41,35 @@ client_credentials**, así que vas a obtener un *client id* y un *client secret*
 Por defecto te dan un límite razonable de consultas por segundo. Para uso intensivo, escribile a
 `pci@imm.gub.uy`.
 
-## 2. Configurar el entorno
+## 2. Configurar las credenciales
 
-Las credenciales se leen del entorno y **nunca se hardcodean**:
+**En local**, ponelas en un YAML que git ignora:
 
 ```bash
-cp .env.example .env
-# editá .env con tu client id y secret
+cp config/application.yaml.example config/application.yaml
+# editá config/application.yaml con tu client id y secret
 ```
+
+Spring Boot lee `./config/` del directorio de trabajo solo, así que `./gradlew bootRun` lo toma
+sin variables de entorno ni flags. Ese archivo está en `.gitignore`: no lo commitees.
+
+> No lo pongas en `src/main/resources/`: todo lo de ahí se empaqueta dentro del jar y terminarías
+> distribuyendo el secreto en el artefacto.
+
+**En producción**, no uses ese archivo: exportá las variables desde el gestor de secretos del
+server, que rellenan los placeholders del `application.yaml` empaquetado.
 
 ```bash
 export MONTEVIDEO_CLIENT_ID=tu-client-id
 export MONTEVIDEO_CLIENT_SECRET=tu-client-secret
 ```
 
-`.env` está en `.gitignore`. No lo commitees.
+> **Ojo con la precedencia**: `config/application.yaml` le gana a las variables de entorno. La
+> variable solo rellena un placeholder del `application.yaml` empaquetado, que es la fuente de
+> menor precedencia, mientras que `config/application.yaml` define la propiedad directamente. Si
+> ese archivo queda en un server, las credenciales del entorno se ignoran **en silencio**.
+
+Si no hay ninguna de las dos fuentes, la app **no arranca** y te dice qué propiedad falta.
 
 ## 3. Levantar el backend
 
@@ -174,6 +188,8 @@ en v0. El lugar para engancharlo está marcado en `TransportePublicoClient`.
   Paralo, o cambiá el puerto publicado en `compose.yaml`.
 - **`503` en todas las consultas**: casi siempre son las credenciales. Fijate en el log si dice
   "No se pudo obtener el token OAuth2".
+- **Las credenciales del server parecen ignorarse**: fijate que no haya quedado un
+  `config/application.yaml` en el directorio de trabajo; le gana a las variables de entorno.
 
 ## Licencia
 

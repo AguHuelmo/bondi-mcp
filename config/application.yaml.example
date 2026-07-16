@@ -1,0 +1,27 @@
+# Plantilla de configuración local.
+#
+#   cp config/application.yaml.example config/application.yaml
+#
+# Después completá tus credenciales en config/application.yaml, que está en .gitignore y nunca
+# se sube. Spring Boot lee ./config/ del directorio de trabajo automáticamente, así que
+# `./gradlew bootRun` lo toma solo, sin variables de entorno ni flags.
+#
+# Por qué acá y no en src/main/resources/: todo lo que vive ahí se empaqueta DENTRO del jar al
+# hacer `./gradlew build`. Un secreto ahí se distribuye con el artefacto.
+#
+# ATENCIÓN, este archivo le GANA a las variables de entorno. No es lo que uno esperaría, pero
+# MONTEVIDEO_CLIENT_ID solo rellena un placeholder del application.yaml empaquetado, que es la
+# fuente de MENOR precedencia; este archivo define la propiedad directamente y pisa aquello.
+# En consecuencia: NO subas este archivo a un server. Si queda ahí, las credenciales del gestor
+# de secretos se ignoran en silencio y vas a estar usando estas. En producción usá las variables
+# de entorno MONTEVIDEO_CLIENT_ID / MONTEVIDEO_CLIENT_SECRET y que este archivo no exista.
+#
+# Si faltan las dos fuentes, la app no arranca y te dice exactamente qué propiedad falta.
+#
+# Las credenciales se sacan registrando una cuenta gratuita en https://api.montevideo.gub.uy
+# (OAuth2 client_credentials: no es una API key). Ver el README.
+
+montevideo:
+  api:
+    client-id: tu-client-id
+    client-secret: tu-client-secret

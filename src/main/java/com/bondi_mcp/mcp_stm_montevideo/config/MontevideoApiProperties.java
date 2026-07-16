@@ -2,6 +2,7 @@ package com.bondi_mcp.mcp_stm_montevideo.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotBlank;
 
@@ -14,7 +15,11 @@ import jakarta.validation.constraints.NotBlank;
  *
  * <p>Los timeouts no están acá: van en {@code spring.http.clients.*}, que Boot aplica a los
  * {@code RestClient} de la app (que son justamente los de Montevideo).
+ *
+ * <p>{@link Validated} no es decorativo: sin él las restricciones de abajo no se ejecutan y la
+ * app arranca sin credenciales, fallando recién en la primera consulta.
  */
+@Validated
 @ConfigurationProperties("montevideo.api")
 public record MontevideoApiProperties(
         @DefaultValue("https://api.montevideo.gub.uy/api/transportepublico") String baseUrl,

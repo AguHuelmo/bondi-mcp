@@ -6,7 +6,10 @@ build/
 !**/src/test/**/build/
 
 ### Credenciales ###
-# Nunca commitear secretos. El template versionado es .env.example.
+# Config local con secretos. Spring lee ./config/ solo; el template versionado es
+# config/application.yaml.example. Nunca commitear el archivo real.
+/config/application.yaml
+/config/application-local.yaml
 .env
 .env.local
 *.env

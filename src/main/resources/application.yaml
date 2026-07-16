@@ -32,9 +32,14 @@ montevideo:
     base-url: https://api.montevideo.gub.uy/api/transportepublico
     token-url: https://mvdapi-auth.montevideo.gub.uy/token
     # Credenciales OAuth2 client_credentials del portal api.montevideo.gub.uy.
-    # Ver README: nunca hardcodear, se leen del entorno.
-    client-id: ${MONTEVIDEO_CLIENT_ID}
-    client-secret: ${MONTEVIDEO_CLIENT_SECRET}
+    # Nunca hardcodear: en local salen de config/application.yaml (ignorado por git) y en
+    # producción de estas variables de entorno. Ver README.
+    #
+    # El default vacío es a propósito: sin él, un placeholder sin resolver se bindea como el
+    # texto literal "${MONTEVIDEO_CLIENT_ID}" y la app arranca con esa basura de credencial.
+    # Vacío + @Validated hace que falle al arrancar con un mensaje claro.
+    client-id: ${MONTEVIDEO_CLIENT_ID:}
+    client-secret: ${MONTEVIDEO_CLIENT_SECRET:}
   paradas:
     # TTL del cache de paradas. Se refresca al vencer, de forma perezosa.
     cache-ttl: 24h
