@@ -1,0 +1,149 @@
+.app {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.cabecera h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.cabecera p {
+  margin: 0 0 1.5rem;
+  color: var(--color-tenue);
+}
+
+.buscador {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.buscador input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  font: inherit;
+  color: inherit;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+}
+
+.buscador input:focus-visible,
+.parada__boton:focus-visible,
+.buscador button:focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
+}
+
+.buscador button {
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-acento);
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.buscador button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.paradas,
+.arribos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.parada {
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  background: var(--color-superficie);
+}
+
+.parada__boton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.parada__boton:hover {
+  background: var(--color-hover);
+}
+
+.parada__descripcion {
+  font-weight: 600;
+}
+
+.parada__codigo {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--color-tenue);
+  font-variant-numeric: tabular-nums;
+}
+
+.arribos {
+  border-top: 1px solid var(--color-borde);
+}
+
+.arribo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+}
+
+.arribo + .arribo {
+  border-top: 1px solid var(--color-borde);
+}
+
+.arribo__linea {
+  flex-shrink: 0;
+  min-width: 3.25rem;
+  padding: 0.2rem 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-align: center;
+  color: #fff;
+  background: var(--color-acento);
+  border-radius: 0.3rem;
+}
+
+.arribo__destino {
+  flex: 1;
+  color: var(--color-tenue);
+  font-size: 0.95rem;
+}
+
+.arribo__espera {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.estado {
+  padding: 0.85rem 1rem;
+  margin: 0;
+  color: var(--color-tenue);
+  font-size: 0.95rem;
+}
+
+.estado--error {
+  color: var(--color-error);
+}

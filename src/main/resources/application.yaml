@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: mcp-stm-montevideo
+
+  jpa:
+    hibernate:
+      # El esquema lo maneja Flyway. Nunca generar DDL desde las entidades.
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+  http:
+    clients:
+      # Ningún fallo de la API externa debe colgar un request nuestro.
+      connect-timeout: 5s
+      read-timeout: 10s
+
+  ai:
+    mcp:
+      server:
+        name: mcp-stm-montevideo
+        version: 0.0.1
+        # Streamable HTTP: esto corre como servicio web, no como proceso stdio.
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
+
+montevideo:
+  api:
+    base-url: https://api.montevideo.gub.uy/api/transportepublico
+    token-url: https://mvdapi-auth.montevideo.gub.uy/token
+    # Credenciales OAuth2 client_credentials del portal api.montevideo.gub.uy.
+    # Ver README: nunca hardcodear, se leen del entorno.
+    client-id: ${MONTEVIDEO_CLIENT_ID}
+    client-secret: ${MONTEVIDEO_CLIENT_SECRET}
+  paradas:
+    # TTL del cache de paradas. Se refresca al vencer, de forma perezosa.
+    cache-ttl: 24h
+    max-resultados-busqueda: 20
+
+logging:
+  level:
+    com.bondi_mcp.mcp_stm_montevideo: INFO
