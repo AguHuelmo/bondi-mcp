@@ -3,12 +3,6 @@ import type { Arribo, ParadaBreve } from '../api/stm'
 import { useArribos, useHace } from '../hooks/useArribos'
 import { HorariosLinea } from './HorariosLinea'
 
-function textoDeEspera(minutos: number): string {
-  if (minutos <= 0) return 'llegando'
-  if (minutos === 1) return '1 min'
-  return `${minutos} min`
-}
-
 /** Los que están por llegar se destacan: son los únicos que se pueden alcanzar corriendo. */
 const MINUTOS_INMINENTE = 3
 
@@ -39,23 +33,30 @@ export function Arribos({
       {datos.arribos.length > 0 ? (
         <ul className="arribos">
           {datos.arribos.map((arribo, i) => (
-            <li key={`${arribo.linea}-${arribo.destino}-${i}`} className="arribo">
+            <li
+              key={`${arribo.linea}-${arribo.destino}-${i}`}
+              className={
+                arribo.esperaEnMinutos <= MINUTOS_INMINENTE ? 'arribo arribo--ya' : 'arribo'
+              }
+            >
               <span className="arribo__linea">{arribo.linea}</span>
               <span className="arribo__destino">
-                {arribo.destino}
+                <span className="arribo__destino-nombre">{arribo.destino}</span>
                 {arribo.distanciaMetros !== null && (
-                  <span className="arribo__distancia">a {arribo.distanciaMetros} m</span>
+                  <span className="arribo__distancia">a {arribo.distanciaMetros} m de acá</span>
                 )}
               </span>
-              <span
-                className={
-                  arribo.esperaEnMinutos <= MINUTOS_INMINENTE
-                    ? 'arribo__espera arribo__espera--ya'
-                    : 'arribo__espera'
-                }
-              >
-                {textoDeEspera(arribo.esperaEnMinutos)}
-              </span>
+
+              {/* El número va suelto de su unidad para poder agrandarlo solo a él: "8" grande y
+                  "min" chico se lee de un vistazo, "8 min" todo junto y grande grita. */}
+              {arribo.esperaEnMinutos <= 0 ? (
+                <span className="arribo__ya">Llegando</span>
+              ) : (
+                <span className="arribo__espera">
+                  <span className="arribo__minutos">{arribo.esperaEnMinutos}</span>
+                  <span className="arribo__unidad">min</span>
+                </span>
+              )}
             </li>
           ))}
         </ul>

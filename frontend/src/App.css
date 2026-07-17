@@ -298,7 +298,8 @@
   overflow: hidden;
   background: var(--color-superficie);
   border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
+  box-shadow: var(--sombra);
 }
 
 .parada--abierta {
@@ -310,14 +311,16 @@
   align-items: center;
 }
 
+/* En columna y no en fila: el nombre de la parada es el título de la tarjeta y se queda con el
+   ancho, en vez de pelearlo contra un dato chico que se apoya en la otra punta. */
 .parada__boton {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
   flex: 1;
   min-width: 0;
-  padding: 0.85rem 0.5rem 0.85rem 1rem;
+  padding: 0.9rem 0.5rem 0.9rem 1rem;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -331,20 +334,35 @@
 }
 
 .parada__descripcion {
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
 }
 
-.parada__dato {
-  flex-shrink: 0;
-  font-size: 0.85rem;
+.parada__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
   color: var(--color-tenue);
   font-variant-numeric: tabular-nums;
 }
 
+/* La distancia es lo que decide si vas a esa parada o a la otra: no puede ser un gris más. */
+.parada__distancia {
+  padding: 0.05rem 0.4rem;
+  font-weight: 700;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border-radius: 0.3rem;
+}
+
 .estrella {
   flex-shrink: 0;
+  align-self: flex-start;
   padding: 0.85rem 0.9rem;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: var(--color-tenue);
   background: none;
@@ -352,12 +370,9 @@
   cursor: pointer;
 }
 
-.estrella:hover {
-  color: #f59e0b;
-}
-
+.estrella:hover,
 .estrella--marcada {
-  color: #f59e0b;
+  color: var(--color-favorita);
 }
 
 /* Arribos ----------------------------------------------------------------- */
@@ -366,49 +381,108 @@
   border-top: 1px solid var(--color-borde);
 }
 
+/* Tres columnas fijas: la línea, el destino, y el minuto siempre pegado a la derecha. Con flex
+   el número se corría según lo largo del destino, y un número que se mueve no se puede escanear
+   de un vistazo, que es exactamente para lo que se abre esta lista. */
 .arribo {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 1rem;
+  gap: 0.85rem;
+  padding: 0.7rem 1rem;
 }
 
 .arribo + .arribo {
   border-top: 1px solid var(--color-borde);
 }
 
+/* El bondi que llegás a agarrar corriendo se ve sin leer nada: pintado, no solo coloreado. */
+.arribo--ya {
+  background: var(--color-ya-suave);
+}
+
+/* En tinta y no en el azul del acento: el azul quedó reservado para lo que se toca, y este
+   chip no se toca. Antes competía con los botones y los links por la misma atención.
+ *
+ * Se define autosuficiente (ancho mínimo y padding propios) y no apoyado en la columna de la
+ * grilla, porque también se usa suelto fuera de los arribos: en el título de la pantalla de
+ * línea, en los horarios y en los tramos de un viaje. El min-width es lo que mantiene los
+ * números alineados entre filas aunque la línea sea "62" o "CE1". */
 .arribo__linea {
-  flex-shrink: 0;
-  min-width: 3.25rem;
-  padding: 0.2rem 0.5rem;
-  font-weight: 700;
-  font-size: 0.9rem;
-  text-align: center;
-  color: #fff;
-  background: var(--color-acento);
-  border-radius: 0.3rem;
-}
-
-.arribo__destino {
-  flex: 1;
-  min-width: 0;
-  color: var(--color-tenue);
+  display: inline-block;
+  min-width: 3rem;
+  padding: 0.3rem 0.5rem;
+  font-weight: 800;
   font-size: 0.95rem;
-}
-
-.arribo__distancia {
-  margin-left: 0.4rem;
-  font-size: 0.8rem;
-  opacity: 0.8;
-}
-
-.arribo__espera {
-  flex-shrink: 0;
-  font-weight: 600;
+  text-align: center;
+  color: var(--color-superficie);
+  background: var(--color-texto);
+  border-radius: 0.4rem;
   font-variant-numeric: tabular-nums;
 }
 
-.arribo__espera--ya {
+/* El texto del chip va en --color-fondo y no en blanco fijo: en oscuro el verde se aclara, y
+   blanco sobre ese verde daba 1.9:1, ilegible. Al usar el fondo, el color se da vuelta solo con
+   el tema y queda oscuro sobre verde claro (9.9:1) o claro sobre verde oscuro (5.0:1). */
+.arribo--ya .arribo__linea {
+  color: var(--color-fondo);
+  background: var(--color-ya);
+}
+
+.arribo__destino {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Adónde va el bondi es la segunda pregunta de la pantalla: va en texto, no en gris. */
+.arribo__destino-nombre {
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arribo__distancia {
+  font-size: 0.75rem;
+  color: var(--color-tenue);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El dato que se vino a buscar. Es lo único grande de la pantalla, y por eso se encuentra. */
+.arribo__espera {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  justify-self: end;
+}
+
+.arribo__minutos {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.arribo__unidad {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-tenue);
+}
+
+.arribo--ya .arribo__minutos,
+.arribo--ya .arribo__unidad {
+  color: var(--color-ya);
+}
+
+/* "Llegando" no lleva número: un 0 gigante diría "cero minutos", que es otra cosa. */
+.arribo__ya {
+  justify-self: end;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--color-ya);
 }
 

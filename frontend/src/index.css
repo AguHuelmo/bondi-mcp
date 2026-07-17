@@ -1,15 +1,34 @@
+/*
+ * Tema de la app.
+ *
+ * Los neutros no son grises puros: están corridos hacia el azul del acento. Es sutil y es a
+ * propósito; un gris neutro de librería se lee como un default y no como una decisión.
+ *
+ * El fondo NO es igual a la superficie: las tarjetas son blancas sobre un papel apenas gris, y
+ * eso es lo que las hace existir sin necesidad de bordes más marcados.
+ *
+ * Reglas de color, para que esto no se degrade con el tiempo:
+ *   - acento: solo lo tocable (links, botones, foco). Nada decorativo.
+ *   - ya: solo el bondi que estás a tiempo de agarrar.
+ *   - favorita: solo la estrella.
+ *   - tenue: solo lo secundario de verdad. Si el dato importa, va en texto.
+ */
 :root {
-  --color-fondo: #ffffff;
+  --color-fondo: #f4f6fa;
   --color-superficie: #ffffff;
-  --color-texto: #1a1a1a;
-  --color-tenue: #6b7280;
-  --color-borde: #e5e7eb;
-  --color-hover: #f9fafb;
-  --color-acento: #1d4ed8;
-  --color-acento-suave: #eff4ff;
-  --color-error: #b91c1c;
-  --color-ya: #047857;
-  --sombra: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 4%);
+  --color-texto: #10151f;
+  --color-tenue: #47526a;
+  --color-borde: #dfe4ee;
+  --color-hover: #eef1f7;
+  --color-acento: #0b5bd3;
+  --color-acento-suave: #e8f0fe;
+  --color-error: #b3261e;
+  /* Verde elegido por contraste, no a ojo: sobre --color-ya-suave da 4.81:1 y bajo el texto del
+     chip 5.04:1. Un verde más lindo y más claro (#00875a) daba 4.02 y el "min" no llegaba. */
+  --color-ya: #007951;
+  --color-ya-suave: #e2f5ee;
+  --color-favorita: #a35a00;
+  --sombra: 0 1px 2px rgb(16 21 31 / 6%), 0 6px 20px rgb(16 21 31 / 6%);
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
@@ -17,19 +36,23 @@
   background: var(--color-fondo);
 }
 
+/* El oscuro está pensado, no invertido: el acento se aclara para tener contraste contra el
+   fondo oscuro, y el ámbar de la estrella sube de luminosidad para no apagarse. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-fondo: #111317;
-    --color-superficie: #191c22;
-    --color-texto: #e8eaed;
-    --color-tenue: #9aa1ac;
-    --color-borde: #2c313a;
-    --color-hover: #21252d;
-    --color-acento: #4d82f3;
-    --color-acento-suave: #1b2536;
+    --color-fondo: #0d1017;
+    --color-superficie: #161b25;
+    --color-texto: #eef1f6;
+    --color-tenue: #9aa5bb;
+    --color-borde: #2a3140;
+    --color-hover: #1e2531;
+    --color-acento: #5b9dff;
+    --color-acento-suave: #16233a;
     --color-error: #f87171;
     --color-ya: #34d399;
-    --sombra: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 25%);
+    --color-ya-suave: #12291f;
+    --color-favorita: #f0b429;
+    --sombra: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 25%);
   }
 }
 

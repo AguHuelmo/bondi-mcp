@@ -41,8 +41,13 @@ export function ListaParadas({
                 onClick={() => onSeleccionar(abierta ? null : parada)}
               >
                 <span className="parada__descripcion">{parada.descripcion}</span>
-                <span className="parada__dato">
-                  {parada.distanciaLegible ?? `#${parada.codigo}`}
+                {/* Antes era la distancia O el código. Van los dos: la distancia decide a qué
+                    parada ir, y el código es lo que se compara con el cartel del refugio. */}
+                <span className="parada__meta">
+                  {parada.distanciaLegible !== undefined && (
+                    <span className="parada__distancia">a {parada.distanciaLegible}</span>
+                  )}
+                  <span>Parada {parada.codigo}</span>
                 </span>
               </button>
 
