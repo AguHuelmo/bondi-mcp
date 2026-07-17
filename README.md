@@ -14,7 +14,17 @@ la misma que usa la app *Cómo Ir*.
 | | MCP | REST |
 |---|---|---|
 | Buscar paradas por dirección o cruce | `buscar_paradas` | `GET /api/paradas?query=...` |
-| Próximos arribos a una parada | `consultar_arribos` | `GET /api/paradas/{codigo}/arribos` |
+| Próximos arribos, y todas las líneas de la parada | `consultar_arribos` | `GET /api/paradas/{codigo}/arribos` |
+| Paradas más cercanas a un punto | `paradas_cercanas` | `GET /api/paradas/cercanas?lat=&lon=` |
+| Cómo ir de un lugar a otro, con o sin transbordo | `como_llego` | `GET /api/viajes?origen=&destino=` |
+
+La búsqueda es tolerante a errores: puntúa por palabras coincidentes en vez de exigirlas todas, y
+si el cruce que pediste no tiene parada, **estima dónde queda y te ofrece las más cercanas con la
+distancia**. Buscar "gabriel pereira y chucarro" —un cruce que no existe— devuelve la parada de
+Gabriel A Pereira y Pedro F Berro a 55 m.
+
+Las tools MCP devuelven además un campo `contexto` que le explica al LLM qué tiene entre manos
+(coincidencia exacta, aproximación, o cruce estimado) y qué conviene repreguntarle al usuario.
 
 ## Stack
 
@@ -25,7 +35,7 @@ la misma que usa la app *Cómo Ir*.
 ## Requisitos
 
 - JDK 25
-- Docker (para el Postgres local; lo levanta solo)
+- Un Postgres corriendo (lo levantás vos; la app no administra contenedores)
 - Node 20+ (para el frontend)
 
 ## 1. Conseguir las credenciales
@@ -71,14 +81,47 @@ export MONTEVIDEO_CLIENT_SECRET=tu-client-secret
 
 Si no hay ninguna de las dos fuentes, la app **no arranca** y te dice qué propiedad falta.
 
-## 3. Levantar el backend
+## 3. Levantar la base
+
+La app no administra contenedores: la base la levantás vos, como más te guste. Por ejemplo:
+
+```bash
+docker run -d --name stm-postgres -p 5432:5432 \
+  -e POSTGRES_DB=mcp_stm_montevideo \
+  -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password \
+  postgres:17-alpine
+```
+
+**Flyway crea las tablas, no la base.** Si usás un Postgres que ya tenías, creala una vez:
+
+```sql
+CREATE DATABASE mcp_stm_montevideo;
+```
+
+Los defaults de la app son `localhost:5432`, base `mcp_stm_montevideo`, usuario y contraseña
+`user`/`password`. Para apuntar a otro lado, cualquiera de estas variables:
+
+| Variable | Default |
+|---|---|
+| `POSTGRES_HOST` | `localhost` |
+| `POSTGRES_PORT` | `5432` |
+| `POSTGRES_DB` | `mcp_stm_montevideo` |
+| `POSTGRES_USER` | `user` |
+| `POSTGRES_PASSWORD` | `password` |
+
+También podés fijarlas en `config/application.yaml`, junto a las credenciales.
+
+> La migración `V1` hace `CREATE EXTENSION IF NOT EXISTS pg_trgm`, que necesita permisos de
+> superusuario. Con el usuario por defecto de un contenedor Postgres va bien; con uno limitado,
+> no.
+
+## 4. Levantar el backend
 
 ```bash
 ./gradlew bootRun
 ```
 
-Gracias al soporte de Docker Compose de Spring Boot, esto levanta el Postgres de `compose.yaml`
-solo y le corre las migraciones de Flyway. El backend queda en <http://localhost:8080>:
+Flyway corre las migraciones al arrancar. El backend queda en <http://localhost:8080>:
 
 - REST en `/api/paradas`
 - MCP en `/mcp`
@@ -89,7 +132,7 @@ Probalo:
 curl "http://localhost:8080/api/paradas?query=18 de julio y ejido"
 ```
 
-## 4. Levantar el frontend
+## 5. Levantar el frontend
 
 ```bash
 cd frontend
@@ -100,7 +143,7 @@ npm run dev
 Queda en <http://localhost:5173>. Vite proxya `/api` al backend en `:8080`, así que no hay que
 configurar CORS.
 
-## 5. Conectarlo a Claude Desktop
+## 6. Conectarlo a Claude Desktop
 
 El servidor habla **Streamable HTTP**, no stdio. Claude Desktop se conecta con el proxy
 `mcp-remote`. Con el backend corriendo, agregá esto a tu `claude_desktop_config.json`:
@@ -159,20 +202,43 @@ Estos no son caprichos, salen de la [spec real](https://api.montevideo.gub.uy/ap
   búsqueda por texto. Por eso existe la tabla `parada_cache`, que se refresca sola y sobre la
   cual buscamos localmente. No es una optimización, es la única forma.
 - **`upcomingbuses` exige el parámetro `lines`**: no se puede pedir "todos los arribos de esta
-  parada" en una llamada. `ArriboService` encadena `/lines` y después `/upcomingbuses`.
+  parada" en una llamada. `ArriboService` averigua primero qué líneas pasan y después consulta.
+  Las líneas van separadas por comas (`lines=60,104`); repetir el parámetro (`lines=60&lines=104`)
+  hace que la API responda 500.
+- **`/buses/busstops/{id}/lines` está roto**: devuelve 400 para cualquier parada. Sería el
+  endpoint natural para saber qué líneas paran ahí. Por eso hay dos fuentes distintas:
+  `GET /buses?busstopId=` da las líneas **con buses circulando** (las únicas que pueden producir
+  un arribo), y el **GTFS estático** da las que pasan siempre, que es lo que se muestra cuando no
+  viene ningún ómnibus.
+- **La API de líneas es case-sensitive**: el GTFS escribe `Ce1` y `upcomingbuses` responde 400 a
+  eso, pero 200 a `CE1`. Las líneas se normalizan a mayúscula al importar.
+- **El GTFS pesa 17 MB** (~2,2 millones de filas en `stop_times.txt`). Se importa al arrancar, en
+  un hilo aparte, y solo si cambió la versión publicada (`version.txt`). Tarda ~10 segundos.
+- **Que una línea pase por dos paradas NO significa que lleve de una a la otra.** La 62 aparece en
+  Gabriel Pereira y Berro y también en 18 de Julio y Ejido, pero de sus 90 viajes que tocan la
+  primera y los 90 que tocan la segunda, **cero tocan ambas**: son los dos sentidos del recorrido.
+  Por eso `como_llego` no cruza listas de líneas sino que exige que, dentro de un mismo recorrido,
+  la parada de bajada tenga **orden mayor** que la de subida. Los 37.490 viajes del GTFS colapsan
+  en ~1.080 recorridos distintos (~60.600 filas), que es lo que guarda `recorrido_parada`.
 - **Si la Intendencia se cae**, un caché vencido se sigue sirviendo (una parada no se muda) y el
   REST responde `503` con un mensaje claro en vez de un 500 opaco.
 
 ## Limitaciones conocidas
 
-- **No se puede buscar paradas por número de línea.** El endpoint de paradas solo devuelve calle,
-  esquina y ubicación; la relación línea↔parada no está ahí. Habría que parsear el GTFS estático
-  (`/buses/gtfs/static/latest/google_transit.zip`) o pegarle a `/lines` por cada parada.
-- **El parseo de arribos no está verificado contra la API real.** La spec de la Intendencia es
-  inconsistente: declara que `upcomingbuses` devuelve `BusLineVariantItem[]` (que no tiene ningún
-  campo de tiempo de arribo) y a la vez define un `ETAItem` con `eta`, `distance` y `position` que
-  ningún endpoint referencia. Asumimos que la respuesta real es `ETAItem[]` y el parseo es
-  tolerante, pero **conviene confirmarlo con credenciales reales**. Ver `EtaItem.java`.
+- **Todavía no se busca por número de línea**, aunque ya se puede: la tabla `parada_linea` tiene
+  la relación completa desde que importamos el GTFS. Falta solo exponerlo en la búsqueda.
+- **No hay geocoder.** El catálogo de la Intendencia solo publica transporte y playas, así que no
+  existe forma de convertir una dirección en un punto. El cruce se **estima** a partir de las
+  paradas de cada calle: si la más cercana de una y de la otra están a menos de 250 m, el cruce
+  está entre las dos. Es una heurística: acierta en cruces reales y se abstiene cuando las calles
+  no se tocan, pero no es geocodificación.
+- **Las distancias son en línea recta**, no caminando: la real siempre es algo mayor.
+- **La spec de la Intendencia no refleja la API real.** `upcomingbuses` declara devolver
+  `BusLineVariantItem[]`, que no tiene ningún campo de tiempo de arribo, cuando en realidad
+  devuelve `ETAItem[]` (verificado contra la API en producción); el `$ref` de la spec está mal.
+  `/buses` tampoco coincide con su `VehicleItem`: trae `company` en vez de `companyName`, más
+  `eType` y `speed`. Por eso todos los DTO del cliente ignoran campos desconocidos y mapean solo
+  lo necesario.
 - Las paradas favoritas tienen su tabla (`V2__paradas_favoritas.sql`) pero todavía no se exponen:
   falta definir cómo se autentican los usuarios.
 
@@ -184,8 +250,12 @@ en v0. El lugar para engancharlo está marcado en `TransportePublicoClient`.
 
 ## Problemas comunes
 
+- **`database "mcp_stm_montevideo" does not exist`**: Flyway crea las tablas, no la base. Corré
+  `CREATE DATABASE mcp_stm_montevideo;` una vez.
 - **`Bind for 0.0.0.0:5432 failed: port is already allocated`**: ya tenés otro Postgres corriendo.
-  Paralo, o cambiá el puerto publicado en `compose.yaml`.
+  Paralo, o levantá este en otro puerto y pasale `POSTGRES_PORT` a `bootRun`.
+- **`Connection refused` al arrancar el backend**: la base no está levantada. La app no la
+  levanta sola.
 - **`503` en todas las consultas**: casi siempre son las credenciales. Fijate en el log si dice
   "No se pudo obtener el token OAuth2".
 - **Las credenciales del server parecen ignorarse**: fijate que no haya quedado un

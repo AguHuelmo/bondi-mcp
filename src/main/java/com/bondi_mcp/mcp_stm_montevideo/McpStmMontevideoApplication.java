@@ -8,8 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class McpStmMontevideoApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(McpStmMontevideoApplication.class, args);
-	}
+    static void main(String[] args) {
+        SpringApplication.run(McpStmMontevideoApplication.class, args);
+    }
 
 }

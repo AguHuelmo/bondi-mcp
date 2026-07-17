@@ -2,6 +2,12 @@ spring:
   application:
     name: mcp-stm-montevideo
 
+  # La base se levanta aparte, a mano (ver README). La app no administra contenedores.
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:mcp_stm_montevideo}
+    username: ${POSTGRES_USER:user}
+    password: ${POSTGRES_PASSWORD:password}
+
   jpa:
     hibernate:
       # El esquema lo maneja Flyway. Nunca generar DDL desde las entidades.
@@ -44,6 +50,12 @@ montevideo:
     # TTL del cache de paradas. Se refresca al vencer, de forma perezosa.
     cache-ttl: 24h
     max-resultados-busqueda: 20
+  geocoder:
+    # Servicio Único de Direcciones Geográficas del Uruguay (IDE). Abierto y sin credenciales,
+    # a diferencia del de transporte. Es lo que permite buscar "gabriel pereira 2470".
+    base-url: https://direcciones.ide.uy/api
+    # Cubre todo el país: sin esto una calle homónima se resuelve en otro departamento.
+    departamento: MONTEVIDEO
 
 logging:
   level:

@@ -20,6 +20,39 @@ class TextoNormalizadorTest {
     }
 
     @Test
+    void reconoce_una_direccion_con_numero_de_puerta() {
+        assertThat(TextoNormalizador.pareceDireccionConNumero("gabriel pereira 2470")).isTrue();
+        assertThat(TextoNormalizador.pareceDireccionConNumero("Coruña 2345")).isTrue();
+        // La calle tiene número y la puerta también: solo la última cuenta.
+        assertThat(TextoNormalizador.pareceDireccionConNumero("18 de julio 1360")).isTrue();
+    }
+
+    @Test
+    void un_cruce_no_es_una_direccion_con_numero() {
+        assertThat(TextoNormalizador.pareceDireccionConNumero("18 de julio y ejido")).isFalse();
+        // Tiene número al final, pero el conector dice que se pidió una esquina.
+        assertThat(TextoNormalizador.pareceDireccionConNumero("gabriel pereira y ejido 1360")).isFalse();
+    }
+
+    @Test
+    void un_codigo_de_parada_suelto_no_es_una_direccion() {
+        // Sin esto, buscar la parada 3977 se iría a geocodificar al pedo.
+        assertThat(TextoNormalizador.pareceDireccionConNumero("3977")).isFalse();
+        assertThat(TextoNormalizador.pareceDireccionConNumero("18 1360")).isFalse();
+    }
+
+    @Test
+    void una_calle_sin_numero_no_es_una_direccion() {
+        assertThat(TextoNormalizador.pareceDireccionConNumero("gabriel pereira")).isFalse();
+        assertThat(TextoNormalizador.pareceDireccionConNumero("18 de julio")).isFalse();
+    }
+
+    @Test
+    void un_numero_absurdamente_largo_no_es_una_puerta() {
+        assertThat(TextoNormalizador.pareceDireccionConNumero("gabriel pereira 123456789")).isFalse();
+    }
+
+    @Test
     void parte_en_palabras() {
         assertThat(TextoNormalizador.enPalabras("18 de Julio y Ejido"))
                 .containsExactly("18", "DE", "JULIO", "Y", "EJIDO");

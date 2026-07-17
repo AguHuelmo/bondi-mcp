@@ -10,18 +10,126 @@
 }
 
 .cabecera p {
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.25rem;
   color: var(--color-tenue);
+}
+
+/* Pestañas ---------------------------------------------------------------- */
+
+.pestanas {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 1.25rem;
+  background: var(--color-hover);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.6rem;
+}
+
+.pestana {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: center;
+  text-decoration: none;
+  color: var(--color-tenue);
+  background: none;
+  border: none;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.pestana:focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
+}
+
+.pestana:hover {
+  color: var(--color-texto);
+}
+
+.pestana--activa {
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra);
+}
+
+/* Botones y campos -------------------------------------------------------- */
+
+.boton {
+  flex-shrink: 0;
+  padding: 0.6rem 0.9rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: inherit;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.boton:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.boton--principal {
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+
+.boton--principal:hover:not(:disabled) {
+  background: var(--color-acento);
+  filter: brightness(1.1);
+}
+
+.boton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.boton-tenue {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+  text-decoration: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.boton-tenue:hover:not(:disabled) {
+  color: var(--color-texto);
+  border-color: var(--color-borde);
+}
+
+.boton-tenue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:where(button, input):focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
 }
 
 .buscador {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
-.buscador input {
+.buscador__input,
+.campo__input {
   flex: 1;
+  min-width: 0;
   padding: 0.6rem 0.8rem;
   font: inherit;
   color: inherit;
@@ -30,42 +138,176 @@
   border-radius: 0.5rem;
 }
 
-.buscador input:focus-visible,
-.parada__boton:focus-visible,
-.buscador button:focus-visible {
-  outline: 2px solid var(--color-acento);
-  outline-offset: 2px;
+/* Campo con autocompletado ------------------------------------------------ */
+
+.campo {
+  position: relative;
 }
 
-.buscador button {
-  padding: 0.6rem 1.1rem;
-  font: inherit;
+.campo__etiqueta {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #fff;
-  background: var(--color-acento);
-  border: none;
+  color: var(--color-tenue);
+}
+
+.campo__fila {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sugerencias {
+  position: absolute;
+  z-index: 500;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
   border-radius: 0.5rem;
+  box-shadow: var(--sombra);
+}
+
+.sugerencia {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0.35rem;
   cursor: pointer;
 }
 
-.buscador button:disabled {
-  opacity: 0.5;
+.sugerencia--resaltada {
+  background: var(--color-acento-suave);
+}
+
+.sugerencia--vacia {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-tenue);
+}
+
+/* El "#1234" de una parada, o "dirección" cuando la sugerencia es una puerta del padrón. */
+.sugerencia__detalle {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Formulario de viaje ----------------------------------------------------- */
+
+.viaje-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.6rem;
+}
+
+.intercambiar {
+  align-self: flex-end;
+  padding: 0.15rem 0.5rem;
+  margin: -0.5rem 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--color-tenue);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.intercambiar:hover:not(:disabled) {
+  color: var(--color-acento);
+}
+
+.intercambiar:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
+/* Secciones y fichas ------------------------------------------------------ */
+
+.seccion {
+  margin-bottom: 1.5rem;
+}
+
+.seccion__titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-tenue);
+}
+
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ficha {
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ficha:hover {
+  border-color: var(--color-acento);
+  color: var(--color-acento);
+}
+
+/* Lista de paradas -------------------------------------------------------- */
+
 .paradas,
-.arribos {
+.arribos,
+.viajes,
+.tramos {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .parada {
-  border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
   margin-bottom: 0.5rem;
   overflow: hidden;
   background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+}
+
+.parada--abierta {
+  border-color: var(--color-acento);
+}
+
+.parada__fila {
+  display: flex;
+  align-items: center;
 }
 
 .parada__boton {
@@ -73,8 +315,9 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  width: 100%;
-  padding: 0.85rem 1rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.85rem 0.5rem 0.85rem 1rem;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -91,12 +334,33 @@
   font-weight: 600;
 }
 
-.parada__codigo {
+.parada__dato {
   flex-shrink: 0;
   font-size: 0.85rem;
   color: var(--color-tenue);
   font-variant-numeric: tabular-nums;
 }
+
+.estrella {
+  flex-shrink: 0;
+  padding: 0.85rem 0.9rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--color-tenue);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.estrella:hover {
+  color: #f59e0b;
+}
+
+.estrella--marcada {
+  color: #f59e0b;
+}
+
+/* Arribos ----------------------------------------------------------------- */
 
 .arribos {
   border-top: 1px solid var(--color-borde);
@@ -127,8 +391,15 @@
 
 .arribo__destino {
   flex: 1;
+  min-width: 0;
   color: var(--color-tenue);
   font-size: 0.95rem;
+}
+
+.arribo__distancia {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 .arribo__espera {
@@ -137,13 +408,491 @@
   font-variant-numeric: tabular-nums;
 }
 
+.arribo__espera--ya {
+  color: var(--color-ya);
+}
+
+.arribos-panel__pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.6rem 0.4rem 1rem;
+  border-top: 1px solid var(--color-borde);
+  background: var(--color-hover);
+}
+
+.arribos-panel__sello {
+  font-size: 0.75rem;
+  color: var(--color-tenue);
+}
+
+/* Líneas que pasan -------------------------------------------------------- */
+
+.lineas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--color-borde);
+}
+
+.lineas__titulo {
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+  margin-right: 0.2rem;
+}
+
+.lineas__lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.lineas__ayuda {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.lineas__linea {
+  padding: 0.1rem 0.4rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-tenue);
+  background: none;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.lineas__linea:hover {
+  color: var(--color-acento);
+  border-color: var(--color-acento);
+}
+
+.lineas__linea--abierta {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+
+.lineas__linea--abierta:hover {
+  color: #fff;
+}
+
+/* Horarios teóricos ------------------------------------------------------- */
+
+.horarios {
+  padding: 0.7rem 1rem 0.8rem;
+  border-top: 1px solid var(--color-borde);
+  background: var(--color-hover);
+}
+
+.horarios__cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.horarios__acciones {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.horarios__titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.horarios__dias {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+}
+
+.horarios__dia {
+  padding: 0.25rem 0.6rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-tenue);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.horarios__dia--activo {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+
+.horarios__grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.6rem, 1fr));
+  gap: 0.25rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.horarios__hora {
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.3rem;
+}
+
+.horarios__hora--proxima {
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-ya);
+  border-color: var(--color-ya);
+}
+
+.horarios__nota {
+  margin: 0.6rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-tenue);
+}
+
+/* Viajes ------------------------------------------------------------------ */
+
+.viaje {
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+}
+
+.viaje--elegido {
+  border-color: var(--color-acento);
+}
+
+.viaje__boton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.viaje__boton:hover {
+  background: var(--color-hover);
+}
+
+.viaje__lineas,
+.viaje__paso {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.viaje__flecha {
+  color: var(--color-tenue);
+}
+
+.viaje__resumen {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--color-tenue);
+  text-align: right;
+}
+
+.tramo {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--color-borde);
+  font-size: 0.9rem;
+}
+
+.tramo__linea {
+  flex-shrink: 0;
+  min-width: 3.25rem;
+  padding: 0.15rem 0.4rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
+  text-decoration: none;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border-radius: 0.3rem;
+}
+
+.tramo__linea:hover {
+  outline: 1px solid var(--color-acento);
+}
+
+.tramo__texto {
+  color: var(--color-tenue);
+  line-height: 1.6;
+}
+
+.tramo__texto strong {
+  color: var(--color-texto);
+  font-weight: 600;
+}
+
+/* Mapa -------------------------------------------------------------------- */
+
+.mapa-bloque {
+  margin-bottom: 1rem;
+}
+
+.mapa {
+  overflow: hidden;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+}
+
+.mapa__lienzo {
+  width: 100%;
+  height: 100%;
+  background: var(--color-hover);
+}
+
+.mapa__detalle {
+  margin-top: 0.2rem;
+  color: var(--color-tenue);
+}
+
+/* Pines: divIcon de Leaflet, dibujados acá para que sigan el tema de la app. */
+
+.leaflet-div-icon.pin-envoltorio {
+  background: none;
+  border: none;
+}
+
+.pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-acento);
+  border: 2px solid var(--color-superficie);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
+
+/* Las paradas sueltas son puntos chicos: son muchas y no deben tapar el mapa. */
+.pin--parada {
+  width: 14px;
+  height: 14px;
+  margin: 8px;
+  background: var(--color-tenue);
+}
+
+.pin--favorita {
+  width: 16px;
+  height: 16px;
+  margin: 7px;
+  background: #f59e0b;
+}
+
+.pin--seleccionada {
+  background: var(--color-acento);
+  transform: scale(1.15);
+}
+
+.pin--subida {
+  background: var(--color-acento);
+}
+
+.pin--bajada {
+  width: 16px;
+  height: 16px;
+  margin: 7px;
+  background: var(--color-ya);
+}
+
+.pin--yo {
+  width: 16px;
+  height: 16px;
+  margin: 7px;
+  background: #2563eb;
+  box-shadow: 0 0 0 6px rgb(37 99 235 / 25%);
+}
+
+/* El lugar buscado: la dirección o el cruce contra el que se miden las paradas de alrededor.
+   Va en rojo y con halo para leerse como "es acá", distinto del azul de "estás acá". */
+.pin--lugar {
+  width: 14px;
+  height: 14px;
+  margin: 8px;
+  background: #dc2626;
+  box-shadow: 0 0 0 6px rgb(220 38 38 / 25%);
+}
+
+/* Un bus: lleva la línea escrita y color propio para no confundirse con las paradas. */
+.pin--bus {
+  font-size: 0.62rem;
+  letter-spacing: -0.02em;
+  background: #7c3aed;
+  border-radius: 0.45rem;
+}
+
+/* Leaflet trae sus propios colores; acá se los alineamos al tema. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra);
+}
+
+.leaflet-popup-content {
+  margin: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--color-tenue);
+}
+
+.leaflet-bar a {
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border-bottom-color: var(--color-borde);
+}
+
+.leaflet-bar a:hover {
+  background: var(--color-hover);
+}
+
+.leaflet-control-attribution {
+  color: var(--color-tenue);
+  background: var(--color-superficie) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-tenue);
+}
+
+/* Pantalla de línea ------------------------------------------------------- */
+
+.linea-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.linea-cabecera__titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.sentidos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.sentido {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-tenue);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.sentido--activo {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+
+.paradas-plegadas {
+  margin-top: 0.5rem;
+}
+
+.paradas-plegadas summary {
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-tenue);
+  cursor: pointer;
+}
+
+.paradas-plegadas__lista {
+  margin: 0.25rem 0 0;
+  padding-left: 2rem;
+  font-size: 0.9rem;
+}
+
+.paradas-plegadas__lista li {
+  padding: 0.15rem 0;
+}
+
+.paradas-plegadas__codigo {
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Estados ----------------------------------------------------------------- */
+
 .estado {
   padding: 0.85rem 1rem;
-  margin: 0;
+  margin: 0 0 0.5rem;
   color: var(--color-tenue);
   font-size: 0.95rem;
 }
 
 .estado--error {
   color: var(--color-error);
+}
+
+.nota {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.8rem;
+  color: var(--color-tenue);
+}
+
+@media (max-width: 30rem) {
+  .viaje__boton {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .viaje__resumen {
+    text-align: left;
+  }
 }

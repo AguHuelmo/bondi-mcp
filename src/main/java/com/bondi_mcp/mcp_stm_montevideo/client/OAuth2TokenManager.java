@@ -27,7 +27,6 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class OAuth2TokenManager {
 
-    /** Margen antes del vencimiento real, para no usar un token que expira en pleno request. */
     private static final Duration MARGEN_RENOVACION = Duration.ofSeconds(30);
 
     private final MontevideoApiProperties properties;
@@ -39,7 +38,6 @@ public class OAuth2TokenManager {
         this.authClient = builder.build();
     }
 
-    /** Devuelve un token válido, renovándolo si hace falta. */
     public String obtenerToken() {
         final TokenVigente actual = cache.get();
         if (actual != null && actual.sigueValido()) {

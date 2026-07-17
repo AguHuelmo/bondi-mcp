@@ -3,6 +3,7 @@ package com.bondi_mcp.mcp_stm_montevideo.client;
 import java.util.List;
 
 import com.bondi_mcp.mcp_stm_montevideo.domain.Arribo;
+import com.bondi_mcp.mcp_stm_montevideo.domain.BusEnVivo;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
 
 /**
@@ -36,8 +37,25 @@ public interface TransportePublicoClient {
      */
     List<Arribo> obtenerProximosArribos(long codigoParada, List<String> lineas, int cantidadPorLinea);
 
-    // Punto de extensión v1: posición en tiempo real de una línea.
-    // La API ya lo expone con GET /buses?lines=... -> VehicleItem[] (id, location, timestamp,
-    // line, origin, destination, companyName). No se implementa en v0.
-    // List<Vehiculo> obtenerPosicionDeLinea(String linea);
+    /**
+     * Versión publicada del GTFS estático (ej. {@code "20260608"}).
+     *
+     * <p>Sirve para no rebajar ni reprocesar el zip si no cambió.
+     */
+    String obtenerVersionGtfs();
+
+    /**
+     * Baja el GTFS estático completo (zip de ~17 MB).
+     *
+     * <p>Es la única fuente de la relación línea↔parada: el endpoint que la daría está roto.
+     */
+    byte[] descargarGtfs();
+
+    /**
+     * Buses en circulación de las líneas indicadas, con su posición actual.
+     *
+     * <p>Trae los coches de toda la ciudad, en ambos sentidos: es para dibujar la línea en un
+     * mapa, no para saber cuál viene a una parada (para eso están los arribos).
+     */
+    List<BusEnVivo> obtenerBusesDeLineas(List<String> lineas);
 }

@@ -46,6 +46,7 @@ public record EtaItem(
     }
 
     public Arribo aArribo() {
-        return new Arribo(line, destination, Duration.ofSeconds(eta), distance, companyName);
+        return new Arribo(line, destination, Duration.ofSeconds(eta), distance, companyName,
+                location == null ? null : location.aCoordenada());
     }
 }

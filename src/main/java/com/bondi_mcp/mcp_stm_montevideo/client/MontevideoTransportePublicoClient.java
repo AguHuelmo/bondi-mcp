@@ -12,11 +12,13 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriBuilder;
 
+import com.bondi_mcp.mcp_stm_montevideo.client.dto.BusEnParadaItem;
+import com.bondi_mcp.mcp_stm_montevideo.client.dto.BusItem;
 import com.bondi_mcp.mcp_stm_montevideo.client.dto.BusStopItem;
 import com.bondi_mcp.mcp_stm_montevideo.client.dto.EtaItem;
-import com.bondi_mcp.mcp_stm_montevideo.client.dto.LineByBusStopItem;
 import com.bondi_mcp.mcp_stm_montevideo.config.MontevideoApiProperties;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Arribo;
+import com.bondi_mcp.mcp_stm_montevideo.domain.BusEnVivo;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
 
 import lombok.extern.slf4j.Slf4j;
@@ -53,15 +55,23 @@ public class MontevideoTransportePublicoClient implements TransportePublicoClien
                 .toList();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Usa {@code GET /buses?busstopId=} y no {@code /buses/busstops/{id}/lines}, que sería el
+     * endpoint natural: ese está roto del lado de la Intendencia y devuelve 400 para cualquier
+     * parada (verificado contra la API en producción). Como efecto, solo se ven líneas con buses
+     * circulando, lo cual está bien: si no hay ningún bus dando vueltas, tampoco hay arribos.
+     */
     @Override
     public List<String> obtenerLineasDeParada(long codigoParada) {
-        final List<LineByBusStopItem> items = get(
-                uri -> uri.path("/buses/busstops/{id}/lines").build(codigoParada),
-                LineByBusStopItem[].class,
+        final List<BusEnParadaItem> items = get(
+                uri -> uri.path("/buses").queryParam("busstopId", codigoParada).build(),
+                BusEnParadaItem[].class,
                 "líneas de la parada " + codigoParada);
 
         return items.stream()
-                .map(LineByBusStopItem::line)
+                .map(BusEnParadaItem::line)
                 .filter(Objects::nonNull)
                 .filter(linea -> !linea.isBlank())
                 .distinct()
@@ -95,6 +105,57 @@ public class MontevideoTransportePublicoClient implements TransportePublicoClien
                 .map(EtaItem::aArribo)
                 .sorted((a, b) -> a.espera().compareTo(b.espera()))
                 .toList();
+    }
+
+    @Override
+    public List<BusEnVivo> obtenerBusesDeLineas(List<String> lineas) {
+        if (lineas.isEmpty()) {
+            // La API sin `lines` devuelve TODOS los buses de la ciudad; nadie pidió eso.
+            return List.of();
+        }
+
+        final String lineasCsv = String.join(",", lineas);
+        final List<BusItem> items = get(
+                uri -> uri.path("/buses").queryParam("lines", lineasCsv).build(),
+                BusItem[].class,
+                "buses de las líneas " + lineasCsv);
+
+        return items.stream()
+                .filter(BusItem::esUtilizable)
+                .map(BusItem::aBusEnVivo)
+                .toList();
+    }
+
+    @Override
+    public String obtenerVersionGtfs() {
+        final String version = obtenerCrudo("/buses/gtfs/static/latest/version.txt",
+                MediaType.TEXT_PLAIN, String.class, "versión del GTFS");
+        return version == null ? "" : version.trim();
+    }
+
+    @Override
+    public byte[] descargarGtfs() {
+        final byte[] zip = obtenerCrudo("/buses/gtfs/static/latest/google_transit.zip",
+                MediaType.APPLICATION_OCTET_STREAM, byte[].class, "archivo GTFS");
+        if (zip == null || zip.length == 0) {
+            throw new TransportePublicoException("El GTFS vino vacío");
+        }
+        return zip;
+    }
+
+    /** GET autenticado que devuelve el cuerpo sin deserializar como JSON. */
+    private <T> T obtenerCrudo(String path, MediaType accept, Class<T> tipo, String queEstabaHaciendo) {
+        try {
+            return restClient.get()
+                    .uri(uri -> uri.path(path).build())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenManager.obtenerToken())
+                    .accept(accept)
+                    .retrieve()
+                    .body(tipo);
+        }
+        catch (RestClientException ex) {
+            throw new TransportePublicoException("Falló la descarga: " + queEstabaHaciendo, ex);
+        }
     }
 
     /**
