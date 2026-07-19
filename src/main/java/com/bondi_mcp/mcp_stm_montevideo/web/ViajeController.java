@@ -9,8 +9,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
+import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
+import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ViajeService;
+import com.bondi_mcp.mcp_stm_montevideo.web.dto.LlegoResponse;
 import com.bondi_mcp.mcp_stm_montevideo.web.dto.ViajeResponse;
 
 import jakarta.validation.constraints.Max;
@@ -29,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 public class ViajeController {
 
     private final ViajeService viajeService;
+    private final EstimadorDeLlegada estimadorDeLlegada;
 
     /**
      * {@code GET /api/viajes?origen=gabriel pereira y berro&destino=18 de julio y ejido}
@@ -52,6 +61,44 @@ public class ViajeController {
                 .map(ViajeResponse::desde)
                 .toList();
         return ResponseEntity.ok(viajes);
+    }
+
+    /**
+     * {@code GET /api/viajes/llego?origen=...&destino=...&hora=18:30}
+     *
+     * <p>El veredicto de "¿llego a tiempo?" para una hora objetivo de hoy. 404 si alguna punta
+     * no se pudo ubicar; 400 si la hora no es HH:MM; 200 con {@code motivo} cuando no hay
+     * pronóstico posible (hora pasada, sin viaje directo con salida hoy).
+     */
+    @GetMapping("/llego")
+    public ResponseEntity<LlegoResponse> llego(
+            @RequestParam("origen") @NotBlank String origen,
+            @RequestParam("destino") @NotBlank String destino,
+            @RequestParam("hora") @NotBlank String hora) {
+
+        final LocalTime horaObjetivo;
+        try {
+            horaObjetivo = LocalTime.parse(hora.trim(), DateTimeFormatter.ofPattern("H:mm"));
+        }
+        catch (DateTimeParseException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        final LocalDateTime ahora = LocalDateTime.now(HorarioTeoricoService.ZONA_MONTEVIDEO);
+        if (!horaObjetivo.isAfter(ahora.toLocalTime())) {
+            return ResponseEntity.ok(LlegoResponse.sin("Esa hora ya pasó hoy."));
+        }
+
+        final var desde = viajeService.ubicar(origen);
+        final var hasta = viajeService.ubicar(destino);
+        if (desde.isEmpty() || hasta.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        return ResponseEntity.ok(estimadorDeLlegada.pronosticar(desde.get(), hasta.get(), horaObjetivo)
+                .map(LlegoResponse::de)
+                .orElseGet(() -> LlegoResponse.sin(
+                        "No hay viaje directo con salida en lo que queda del día.")));
     }
 
     /** Variante por coordenadas, para cuando el origen sale del GPS. */

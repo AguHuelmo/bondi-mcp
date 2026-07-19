@@ -1,6 +1,8 @@
 package com.bondi_mcp.mcp_stm_montevideo.bot;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +21,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.ArribosDeParada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ParadaCercana;
+import com.bondi_mcp.mcp_stm_montevideo.domain.PronosticoDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.domain.SalidaTeorica;
@@ -27,6 +30,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
+import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -57,6 +61,10 @@ public class RespondedorDirecto {
     private static final int MAXIMAS_OPCIONES_DE_VIAJE = 3;
     private static final int PROXIMAS_SALIDAS = 3;
 
+    /** "llego origen > destino 18:30": el veredicto de si se llega a tiempo. */
+    private static final Pattern LLEGO = Pattern.compile(
+            "(?iu)^llego\\s+(.+?)\\s*>\\s*(.+?)\\s+(?:a\\s+las?\\s+)?(\\d{1,2}):(\\d{2})\\s*$");
+
     /** "avisame 3977 185" o "avisame 3977 185 10": parada, línea y minutos opcionales. */
     private static final Pattern AVISAME =
             Pattern.compile("(?iu)^(?:av[ií]same?|alerta)\\s+(\\d{1,7})\\s+(\\S{1,6})(?:\\s+(\\d{1,2}))?$");
@@ -72,6 +80,7 @@ public class RespondedorDirecto {
             · linea 185 para ver el recorrido y cuántos coches andan
             · avisame 3977 185 y te escribo cuando esté a 5 min o menos
               (avisame 3977 185 10 si querés 10 min; "alertas" las lista, "cancelar" las corta)
+            · llego origen > destino 18:30 y te digo si llegás a esa hora
             · conectividad gabriel pereira 2470 para saber qué tan bien servida está esa zona
             · o compartime tu ubicación con el clip 📎 y te muestro las paradas cercanas
 
@@ -90,6 +99,7 @@ public class RespondedorDirecto {
     private final BusEnVivoService busEnVivoService;
     private final HorarioTeoricoService horarioTeoricoService;
     private final ConectividadService conectividadService;
+    private final EstimadorDeLlegada estimadorDeLlegada;
     private final GuardiaDeArribos guardiaDeArribos;
 
     /** La última lista de paradas que vio cada charla, para poder elegir por número de opción. */
@@ -151,6 +161,11 @@ public class RespondedorDirecto {
                     parada.get(),
                     aviso.group(2),
                     aviso.group(3) == null ? null : Integer.valueOf(aviso.group(3)));
+        }
+        final Matcher llego = LLEGO.matcher(texto);
+        if (llego.matches()) {
+            return llego(llego.group(1), llego.group(2),
+                    Integer.parseInt(llego.group(3)), Integer.parseInt(llego.group(4)));
         }
         if (texto.contains(">")) {
             return viaje(texto);
@@ -355,6 +370,63 @@ public class RespondedorDirecto {
 
     private static String metros(int total) {
         return total < 1000 ? total + " m" : String.format(Locale.ROOT, "%.1f km", total / 1000.0);
+    }
+
+    /** El veredicto de "¿llego?", contado como para alguien apurado. */
+    private String llego(String origen, String destino, int hora, int minuto) {
+        if (hora > 23 || minuto > 59) {
+            return "Esa hora no existe 😅 Mandala como HH:MM, por ejemplo: llego "
+                    + origen + " > " + destino + " 18:30";
+        }
+        final LocalTime objetivo = LocalTime.of(hora, minuto);
+        final LocalDateTime ahora = LocalDateTime.now(HorarioTeoricoService.ZONA_MONTEVIDEO);
+        if (!objetivo.isAfter(ahora.toLocalTime())) {
+            return "Las " + objetivo.format(DateTimeFormatter.ofPattern("HH:mm"))
+                    + " ya pasaron hoy. Solo pronostico para lo que queda del día.";
+        }
+
+        final Optional<Coordenada> desde = viajeService.ubicar(origen.trim());
+        final Optional<Coordenada> hasta = viajeService.ubicar(destino.trim());
+        if (desde.isEmpty() || hasta.isEmpty()) {
+            final String cual = desde.isEmpty() ? origen.trim() : destino.trim();
+            return "No pude ubicar \"" + cual + "\". Probá con un cruce de calles o una "
+                    + "dirección con número.";
+        }
+
+        return estimadorDeLlegada.pronosticar(desde.get(), hasta.get(), objetivo)
+                .map(pronostico -> contarPronostico(pronostico, objetivo))
+                .orElse("No encontré ningún viaje directo con salida en lo que queda del día "
+                        + "entre esos dos puntos. Probá el planificador: " + origen.trim()
+                        + " > " + destino.trim());
+    }
+
+    private static String contarPronostico(PronosticoDeLlegada pronostico, LocalTime objetivo) {
+        final String horaObjetivo = objetivo.format(DateTimeFormatter.ofPattern("HH:mm"));
+        final String veredicto;
+        if (!pronostico.llega()) {
+            veredicto = "🏁 ¿Llegás a las " + horaObjetivo + "? No: te faltarían "
+                    + Math.abs(pronostico.margenMinutos()) + " min 😬";
+        }
+        else if (pronostico.margenMinutos() < 10) {
+            veredicto = "🏁 ¿Llegás a las " + horaObjetivo + "? Sí, pero JUSTO: "
+                    + pronostico.margenMinutos() + " min de margen. Salí YA.";
+        }
+        else {
+            veredicto = "🏁 ¿Llegás a las " + horaObjetivo + "? Sí, con "
+                    + pronostico.margenMinutos() + " min de margen.";
+        }
+
+        return veredicto + "\n\n"
+                + "· caminás " + pronostico.caminataInicialMinutos() + " min a "
+                + pronostico.subida().descripcion() + " (parada " + pronostico.subida().codigo() + ")\n"
+                + "· la " + pronostico.linea() + " que alcanzás pasa en " + pronostico.esperaMinutos()
+                + " min " + (pronostico.esperaEnTiempoReal() ? "(en vivo)" : "(horario programado)") + "\n"
+                + "· " + pronostico.viajeMinutos() + " min arriba del bondi\n"
+                + "· bajás en " + pronostico.bajada().descripcion() + " y caminás "
+                + pronostico.caminataFinalMinutos() + " min\n\n"
+                + "Llegada estimada: " + pronostico.llegadaEstimada()
+                        .format(DateTimeFormatter.ofPattern("HH:mm"))
+                + ". Es una guía: el tránsito manda 🚌";
     }
 
     /** El índice de conectividad, contado como para un chat. */

@@ -21,6 +21,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
+import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -61,6 +62,9 @@ class TransporteMcpToolsTest {
 
     @Mock
     private ConectividadService conectividadService;
+
+    @Mock
+    private EstimadorDeLlegada estimadorDeLlegada;
 
     @InjectMocks
     private TransporteMcpTools tools;
@@ -216,6 +220,22 @@ class TransporteMcpToolsTest {
         assertThat(respuesta.indice().nivel()).isEqualTo("muy buena");
         assertThat(respuesta.indice().porcentajeDeLaCiudadAlcanzable()).isEqualTo(41);
         assertThat(respuesta.contexto()).contains("cuatro componentes");
+    }
+
+    @Test
+    void llego_a_tiempo_rechaza_una_hora_mal_formateada() {
+        final var respuesta = tools.llegoATiempo("a", "b", "seis y media");
+
+        assertThat(respuesta.veredicto()).isNull();
+        assertThat(respuesta.contexto()).contains("HH:MM");
+    }
+
+    @Test
+    void llego_a_tiempo_avisa_si_la_hora_ya_paso() {
+        final var respuesta = tools.llegoATiempo("a", "b", "00:00");
+
+        assertThat(respuesta.veredicto()).isNull();
+        assertThat(respuesta.contexto()).contains("ya pasó");
     }
 
     @Test

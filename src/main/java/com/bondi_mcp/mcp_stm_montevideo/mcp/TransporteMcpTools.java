@@ -2,6 +2,9 @@ package com.bondi_mcp.mcp_stm_montevideo.mcp;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -15,6 +18,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.ArribosDeParada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.HorariosDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
+import com.bondi_mcp.mcp_stm_montevideo.domain.PronosticoDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.PuntoDeReferencia;
 import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
@@ -25,6 +29,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
+import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -64,6 +69,7 @@ public class TransporteMcpTools {
     private final RecorridoService recorridoService;
     private final BusEnVivoService busEnVivoService;
     private final ConectividadService conectividadService;
+    private final EstimadorDeLlegada estimadorDeLlegada;
 
     @McpTool(name = "buscar_paradas",
             description = """
@@ -605,8 +611,122 @@ public class TransporteMcpTools {
                 o tres datos concretos, no la lista entera de números.""";
     }
 
+
+    @McpTool(name = "llego_a_tiempo",
+            description = """
+                    Responde "¿llego a tiempo?": dado un origen, un destino y una hora objetivo \
+                    de HOY (formato HH:MM, hora de Montevideo), cruza el planificador con el \
+                    tiempo real y devuelve el veredicto con su desglose: caminata a la parada, \
+                    cuándo pasa el primer bondi ALCANZABLE (descarta los que pasan antes de que \
+                    llegues caminando), minutos arriba y caminata final.
+
+                    Usala cuando el usuario pregunte si le da el tiempo ("¿llego a la facultad \
+                    a las 8?"). Es una estimación: transmitila como guía, nunca como promesa. \
+                    Solo evalúa viajes directos; con transbordo no se puede prometer una hora \
+                    con honestidad.""")
+    public RespuestaLlegada llegoATiempo(
+            @McpToolParam(description = "Dirección o cruce de calles de origen", required = true)
+            String origen,
+            @McpToolParam(description = "Dirección o cruce de calles de destino", required = true)
+            String destino,
+            @McpToolParam(description = "Hora objetivo de hoy, como \"18:30\"", required = true)
+            String horaObjetivo) {
+
+        final LocalTime hora;
+        try {
+            hora = LocalTime.parse(horaObjetivo.trim(), DateTimeFormatter.ofPattern("H:mm"));
+        }
+        catch (DateTimeParseException ex) {
+            return new RespuestaLlegada(origen, destino, horaObjetivo, null,
+                    "La hora objetivo tiene que venir como HH:MM en 24 horas, por ejemplo "
+                            + "\"18:30\". Corregila y volvé a llamar.");
+        }
+
+        final LocalDateTime ahora = LocalDateTime.now(HorarioTeoricoService.ZONA_MONTEVIDEO);
+        if (!hora.isAfter(ahora.toLocalTime())) {
+            return new RespuestaLlegada(origen, destino, horaObjetivo, null,
+                    "Esa hora ya pasó hoy en Montevideo (son las "
+                            + ahora.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))
+                            + "). Esta tool solo pronostica para lo que queda del día: aclaralo "
+                            + "y preguntale al usuario la hora correcta.");
+        }
+
+        try {
+            final Optional<Coordenada> desde = viajeService.ubicar(origen);
+            final Optional<Coordenada> hasta = viajeService.ubicar(destino);
+            if (desde.isEmpty() || hasta.isEmpty()) {
+                final String cual = desde.isEmpty() ? origen : destino;
+                return new RespuestaLlegada(origen, destino, horaObjetivo, null,
+                        "No se pudo ubicar \"" + cual + "\" en Montevideo. Verificalo con "
+                                + "buscar_paradas o pedile al usuario que la aclare.");
+            }
+
+            return estimadorDeLlegada.pronosticar(desde.get(), hasta.get(), hora)
+                    .map(pronostico -> new RespuestaLlegada(origen, destino, horaObjetivo,
+                            Veredicto.desde(pronostico), contextoDeLlegada(pronostico)))
+                    .orElseGet(() -> new RespuestaLlegada(origen, destino, horaObjetivo, null,
+                            "No hay ningún viaje directo con salida en lo que queda del día "
+                                    + "entre esos dos puntos. Puede que solo se llegue con "
+                                    + "transbordo (probá como_llego) o que ya no haya servicio: "
+                                    + "decíselo al usuario sin inventar una hora."));
+        }
+        catch (TransportePublicoException ex) {
+            log.warn("Falló el pronóstico '{}' -> '{}': {}", origen, destino, ex.getMessage());
+            return new RespuestaLlegada(origen, destino, horaObjetivo, null, SIN_DATOS_DE_PARADAS);
+        }
+    }
+
+    private static String contextoDeLlegada(PronosticoDeLlegada pronostico) {
+        final String base = pronostico.esperaEnTiempoReal()
+                ? "La espera sale del tiempo real de la Intendencia. "
+                : "OJO: no hay buses de la línea transmitiendo ahora, la espera sale de los "
+                        + "horarios PROGRAMADOS y es menos confiable. Decilo. ";
+        if (!pronostico.llega()) {
+            return base + "No llega: faltan " + Math.abs(pronostico.margenMinutos()) + " minutos. "
+                    + "Decíselo sin vueltas y ofrecé alternativas (salir igual ya, otra hora, "
+                    + "taxi). No suavices el veredicto.";
+        }
+        if (pronostico.margenMinutos() < 10) {
+            return base + "Llega pero JUSTO. Recomendale salir ya mismo: la estimación no tiene "
+                    + "colchón para un semáforo largo. El desglose te dice cuánto camina y "
+                    + "cuánto espera: usalo para que entienda dónde está el riesgo.";
+        }
+        return base + "Llega con margen. Dale el veredicto, la hora estimada y el dato clave: "
+                + "qué bondi tomar, dónde, y en cuántos minutos pasa. Es una estimación con "
+                + "distancias en línea recta: presentala como guía, no como promesa.";
+    }
+
     /** Parada devuelta por la búsqueda. */
     public record ParadaEncontrada(long codigo, String descripcion, Double latitud, Double longitud) {
+    }
+
+    /** El veredicto de llego_a_tiempo, con el desglose minuto a minuto. */
+    public record Veredicto(boolean llega, int margenMinutos, String llegadaEstimada, String linea,
+            long codigoSubida, String subida, long codigoBajada, String bajada,
+            int caminataInicialMinutos, int esperaMinutos, int viajeMinutos,
+            int caminataFinalMinutos, boolean esperaEnTiempoReal) {
+
+        static Veredicto desde(PronosticoDeLlegada pronostico) {
+            return new Veredicto(
+                    pronostico.llega(),
+                    pronostico.margenMinutos(),
+                    pronostico.llegadaEstimada().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    pronostico.linea(),
+                    pronostico.subida().codigo(),
+                    pronostico.subida().descripcion(),
+                    pronostico.bajada().codigo(),
+                    pronostico.bajada().descripcion(),
+                    pronostico.caminataInicialMinutos(),
+                    pronostico.esperaMinutos(),
+                    pronostico.viajeMinutos(),
+                    pronostico.caminataFinalMinutos(),
+                    pronostico.esperaEnTiempoReal());
+        }
+    }
+
+    /** Resultado de llego_a_tiempo. {@code veredicto} viene null si no se pudo pronosticar. */
+    public record RespuestaLlegada(String origen, String destino, String horaObjetivo,
+            Veredicto veredicto, String contexto) {
     }
 
     /** El índice de conectividad, con los datos que justifican el puntaje. */

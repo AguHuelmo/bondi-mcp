@@ -25,6 +25,7 @@ la misma que usa la app *Cómo Ir*.
 | El recorrido completo de una línea, por sentido | `recorrido_de_linea` | `GET /api/lineas/{linea}/recorridos` |
 | Dónde está cada coche de una línea, en vivo | `buses_en_vivo` | `GET /api/lineas/{linea}/buses` |
 | Qué tan bien servida por ómnibus está una dirección | `conectividad` | `GET /api/conectividad?query=...` |
+| ¿Llego a tiempo? Veredicto con desglose minuto a minuto | `llego_a_tiempo` | `GET /api/viajes/llego?origen=&destino=&hora=` |
 
 El **índice de conectividad** es el dato que ninguna app de transporte da: no "cuándo viene el
 bondi" sino "¿me conviene mudarme acá?". Puntúa de 0 a 100 con cuatro componentes —cercanía de
@@ -214,6 +215,7 @@ mensaje cuesta cero y se puede dejar público sin miedo. Entiende:
 | `gabriel pereira 2470` | las paradas más cercanas a esa puerta, con la distancia |
 | `1`, `2`, `3`… | elegir de la última lista que te mandó, sin código de cartel |
 | `estadio centenario > pocitos` | qué línea tomar, dónde subir y dónde bajar |
+| `llego casa de al lado > facultad 18:30` | si llegás a esa hora, con el desglose y el veredicto |
 | `linea 185` | el recorrido y cuántos coches andan ahora |
 | `conectividad gabriel pereira 2470` | el índice de conectividad de esa zona, 0 a 100 |
 | `avisame 3977 185` | un aviso cuando la 185 esté a 5 min o menos de esa parada |
@@ -272,6 +274,76 @@ bot:
 
 Para pasar del número de prueba a uno real hace falta verificar el negocio en Meta; el código no
 cambia.
+
+## Guía de prueba: todo lo que hay, superficie por superficie
+
+Cada funcionalidad, para qué sirve y cómo probarla. Todo corre sobre la misma capa de servicio,
+así que lo que ves en una superficie existe (o puede existir) en las otras.
+
+### MCP — para agentes de IA (Claude Desktop y compatibles)
+
+Conectá el server (sección 6) y probá cada tool con una pregunta en lenguaje natural:
+
+| Tool | Para qué sirve | Probala preguntando |
+|---|---|---|
+| `buscar_paradas` | Encontrar paradas por dirección con puerta, cruce, lugar o código; distingue exacto de aproximado con el campo `contexto` | *"¿Qué paradas hay en 18 de julio y Ejido?"* / *"gabriel pereira 2470"* |
+| `paradas_cercanas` | Las paradas alrededor de una coordenada | *"¿Qué paradas tengo cerca?"* (compartiendo ubicación) |
+| `consultar_arribos` | Próximos ómnibus de una parada + todas las líneas que paran ahí | *"¿Cuándo pasa el próximo bondi por la parada 3977?"* |
+| `como_llego` | Qué línea une dos puntos, con paradas de subida y bajada, usando el orden real de los recorridos | *"¿Cómo llego del Estadio Centenario a Pocitos?"* |
+| `horarios_teoricos` | Todos los horarios programados de una línea en una parada, por tipo de día | *"¿Qué horarios tiene la 185 en la parada 3977 los domingos?"* |
+| `proxima_salida` | La próxima salida programada, con trasnoche y cambio de día ya resueltos por el servidor | *"¿A qué hora sale la próxima 185 de la parada 3977?"* (probalo de noche) |
+| `recorrido_de_linea` | Todas las paradas de una línea, en orden, por sentido | *"¿Por dónde va la 185?"* |
+| `buses_en_vivo` | La posición GPS actual de cada coche de una línea | *"¿Dónde anda la 185 ahora?"* |
+| `conectividad` | Índice 0–100 de qué tan bien servida está una dirección | *"¿Está bien conectado un apartamento en 26 de marzo y Buxareo?"* |
+| `llego_a_tiempo` | Veredicto de si llegás a una hora, cruzando planificador y tiempo real | *"Estoy en Gabriel Pereira y Berro, ¿llego a 18 y Ejido a las 18:30?"* |
+
+### WEB — API REST y páginas
+
+La API para el frontend React (`npm run dev` en `frontend/`, puerto 5173) y para integradores.
+Con el backend en `:8080`:
+
+| Qué | Cómo probarlo |
+|---|---|
+| Buscar paradas | `curl "localhost:8080/api/paradas?query=18 de julio y ejido"` |
+| Paradas cercanas | `curl "localhost:8080/api/paradas/cercanas?lat=-34.906&lon=-56.19"` |
+| Arribos de una parada | `curl localhost:8080/api/paradas/3977/arribos` |
+| Horarios de una línea en una parada | `curl localhost:8080/api/paradas/3977/lineas/185/horarios` |
+| Planificar un viaje | `curl "localhost:8080/api/viajes?origen=estadio centenario&destino=pocitos"` |
+| Viaje desde el GPS | `curl "localhost:8080/api/viajes/desde-punto?lat=-34.9&lon=-56.16&destino=tres cruces"` |
+| ¿Llego a tiempo? | `curl "localhost:8080/api/viajes/llego?origen=gabriel pereira y berro&destino=18 de julio y ejido&hora=18:30"` |
+| Recorrido de una línea | `curl localhost:8080/api/lineas/185/recorridos` |
+| Coches en vivo de una línea | `curl localhost:8080/api/lineas/185/buses` |
+| Tramo real entre dos paradas | `curl "localhost:8080/api/lineas/185/tramo?subida=3977&bajada=1234"` |
+| Índice de conectividad | `curl "localhost:8080/api/conectividad?query=gabriel pereira 2470"` |
+| Conectividad por coordenada | `curl "localhost:8080/api/conectividad/punto?lat=-34.906&lon=-56.19"` |
+| **Demo para inmobiliarias** | abrir <http://localhost:8080/demo-conectividad.html> |
+| **Widget embebible** | abrir <http://localhost:8080/conectividad.html?query=18%20de%20julio%20y%20ejido> |
+| Frontend completo (mapa, arribos, planificador) | `cd frontend && npm run dev` → <http://localhost:5173> |
+
+### BOT — Telegram (y WhatsApp con la Cloud API)
+
+Configurá el token (sección 7) y mandale estos mensajes. Todos funcionan en el modo comandos,
+gratis por mensaje; los mismos aplican por WhatsApp (sección 8):
+
+| Mensaje | Qué hace |
+|---|---|
+| `/start` u `hola` | La ayuda con todos los comandos |
+| `3977` | Arribos de esa parada + líneas que pasan |
+| `3977 185` | Próximas salidas programadas de la 185 por ahí |
+| `18 de julio y ejido` | Busca paradas por cruce; lista numerada para elegir |
+| `gabriel pereira 2470` | Paradas más cercanas a esa puerta, con distancia |
+| `1`, `2`, `3`… | Elige de la última lista, sin código de cartel |
+| `estadio centenario > pocitos` | Planifica el viaje: línea, subida, bajada, caminata |
+| `llego 21 de setiembre 2800 > 18 de julio y ejido 18:30` | ¿Llegás a esa hora? Veredicto con desglose |
+| `linea 185` | Recorrido por sentido + cuántos coches andan ahora |
+| `conectividad 26 de marzo y buxareo` | El índice de conectividad de esa zona |
+| `avisame 3977 185` | Alerta: te escribe cuando la 185 esté a ≤5 min (`avisame 3977 185 10` para 10) |
+| `avisame 2 185` | La misma alerta, eligiendo la parada de la última lista |
+| `alertas` / `cancelar` | Ver o cortar tus alertas |
+| 📎 compartir ubicación | Las 5 paradas más cercanas, numeradas |
+
+Extra opcional del bot: con `bot.claude.api-key` configurada, Telegram pasa a modo lenguaje
+natural (Claude con las mismas tools del MCP). WhatsApp queda siempre en modo comandos.
 
 ## Tests
 

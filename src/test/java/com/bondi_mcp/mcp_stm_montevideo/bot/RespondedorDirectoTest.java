@@ -21,6 +21,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
+import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -61,6 +62,9 @@ class RespondedorDirectoTest {
 
     @Mock
     private ConectividadService conectividadService;
+
+    @Mock
+    private EstimadorDeLlegada estimadorDeLlegada;
 
     @Mock
     private GuardiaDeArribos guardiaDeArribos;
@@ -211,6 +215,18 @@ class RespondedorDirectoTest {
                 .contains("muy buena")
                 .contains("80 m")
                 .contains("41% de la ciudad");
+    }
+
+    @Test
+    void llego_con_una_hora_inexistente_lo_dice_con_gracia() {
+        assertThat(respondedor.responder(CHARLA, "llego casa > trabajo 25:70"))
+                .contains("no existe");
+    }
+
+    @Test
+    void llego_con_una_hora_que_ya_paso_no_pronostica() {
+        assertThat(respondedor.responder(CHARLA, "llego casa > trabajo 00:00"))
+                .contains("ya pasaron");
     }
 
     @Test
