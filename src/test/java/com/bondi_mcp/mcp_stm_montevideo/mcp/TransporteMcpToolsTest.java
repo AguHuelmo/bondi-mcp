@@ -17,8 +17,10 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.domain.SalidaTeorica;
 import com.bondi_mcp.mcp_stm_montevideo.domain.TipoDia;
+import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
+import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -56,6 +58,9 @@ class TransporteMcpToolsTest {
 
     @Mock
     private BusEnVivoService busEnVivoService;
+
+    @Mock
+    private ConectividadService conectividadService;
 
     @InjectMocks
     private TransporteMcpTools tools;
@@ -186,6 +191,31 @@ class TransporteMcpToolsTest {
         assertThat(respuesta.sentidos().getFirst().paradas())
                 .extracting(TransporteMcpTools.ParadaDeRecorrido::codigo)
                 .containsExactly(3977L, 3179L);
+    }
+
+    @Test
+    void conectividad_de_un_lugar_no_ubicable_lo_dice_en_el_contexto() {
+        given(viajeService.ubicar("narnia 123")).willReturn(java.util.Optional.empty());
+
+        final var respuesta = tools.conectividad("narnia 123");
+
+        assertThat(respuesta.indice()).isNull();
+        assertThat(respuesta.contexto()).contains("No se pudo ubicar");
+    }
+
+    @Test
+    void conectividad_devuelve_el_indice_con_sus_componentes() {
+        final var punto = new Coordenada(-34.91, -56.15);
+        given(viajeService.ubicar("gabriel pereira 2470")).willReturn(java.util.Optional.of(punto));
+        given(conectividadService.medir(punto)).willReturn(new Conectividad(
+                75, "muy buena", 3, 80, List.of("185", "405"), 900, 8, 48, 2000L, 4900L));
+
+        final var respuesta = tools.conectividad("gabriel pereira 2470");
+
+        assertThat(respuesta.indice().puntaje()).isEqualTo(75);
+        assertThat(respuesta.indice().nivel()).isEqualTo("muy buena");
+        assertThat(respuesta.indice().porcentajeDeLaCiudadAlcanzable()).isEqualTo(41);
+        assertThat(respuesta.contexto()).contains("cuatro componentes");
     }
 
     @Test

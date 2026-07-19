@@ -24,6 +24,14 @@ la misma que usa la app *Cómo Ir*.
 | Próxima salida programada, con la trasnoche ya resuelta | `proxima_salida` | — |
 | El recorrido completo de una línea, por sentido | `recorrido_de_linea` | `GET /api/lineas/{linea}/recorridos` |
 | Dónde está cada coche de una línea, en vivo | `buses_en_vivo` | `GET /api/lineas/{linea}/buses` |
+| Qué tan bien servida por ómnibus está una dirección | `conectividad` | `GET /api/conectividad?query=...` |
+
+El **índice de conectividad** es el dato que ninguna app de transporte da: no "cuándo viene el
+bondi" sino "¿me conviene mudarme acá?". Puntúa de 0 a 100 con cuatro componentes —cercanía de
+la parada (0–25), variedad de líneas (0–25), frecuencia diurna (0–30) y a qué parte de la ciudad
+se llega sin transbordo (0–20)— calculados enteramente con datos propios (paradas, recorridos y
+horarios del GTFS), sin ninguna llamada externa. Pensado para embeberse donde una dirección
+importa: portales inmobiliarios, análisis urbano, decidir dónde poner un local.
 
 La búsqueda es tolerante a errores: puntúa por palabras coincidentes en vez de exigirlas todas, y
 si el cruce que pediste no tiene parada, **estima dónde queda y te ofrece las más cercanas con la
@@ -202,6 +210,7 @@ mensaje cuesta cero y se puede dejar público sin miedo. Entiende:
 | `1`, `2`, `3`… | elegir de la última lista que te mandó, sin código de cartel |
 | `estadio centenario > pocitos` | qué línea tomar, dónde subir y dónde bajar |
 | `linea 185` | el recorrido y cuántos coches andan ahora |
+| `conectividad gabriel pereira 2470` | el índice de conectividad de esa zona, 0 a 100 |
 | `avisame 3977 185` | un aviso cuando la 185 esté a 5 min o menos de esa parada |
 | `avisame 3977 185 10` | lo mismo pero con 10 minutos de anticipación |
 | `alertas` / `cancelar` | ver o cortar tus alertas activas |

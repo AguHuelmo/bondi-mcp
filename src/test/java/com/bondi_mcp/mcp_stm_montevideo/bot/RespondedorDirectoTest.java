@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.bondi_mcp.mcp_stm_montevideo.client.TransportePublicoException;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Arribo;
+import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ArribosDeParada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
@@ -19,6 +20,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
+import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -56,6 +58,9 @@ class RespondedorDirectoTest {
 
     @Mock
     private HorarioTeoricoService horarioTeoricoService;
+
+    @Mock
+    private ConectividadService conectividadService;
 
     @Mock
     private GuardiaDeArribos guardiaDeArribos;
@@ -190,6 +195,22 @@ class RespondedorDirectoTest {
         given(recorridoService.recorridoDe("2")).willReturn(new RecorridoDeLinea("2", List.of()));
 
         assertThat(respondedor.responder(Charla.telegram(98), "2")).contains("No encontré la parada 2");
+    }
+
+    @Test
+    void conectividad_de_una_direccion_resume_el_indice() {
+        final Coordenada punto = new Coordenada(-34.91, -56.15);
+        given(viajeService.ubicar("gabriel pereira 2470")).willReturn(Optional.of(punto));
+        given(conectividadService.medir(punto)).willReturn(new Conectividad(
+                75, "muy buena", 3, 80, List.of("185", "405"), 900, 8, 48, 2000L, 4900L));
+
+        final String respuesta = respondedor.responder(CHARLA, "conectividad gabriel pereira 2470");
+
+        assertThat(respuesta)
+                .contains("75/100")
+                .contains("muy buena")
+                .contains("80 m")
+                .contains("41% de la ciudad");
     }
 
     @Test

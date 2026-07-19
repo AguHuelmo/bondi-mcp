@@ -23,8 +23,10 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.domain.SalidaTeorica;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Viaje;
+import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
+import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -70,6 +72,7 @@ public class RespondedorDirecto {
             · linea 185 para ver el recorrido y cuántos coches andan
             · avisame 3977 185 y te escribo cuando esté a 5 min o menos
               (avisame 3977 185 10 si querés 10 min; "alertas" las lista, "cancelar" las corta)
+            · conectividad gabriel pereira 2470 para saber qué tan bien servida está esa zona
             · o compartime tu ubicación con el clip 📎 y te muestro las paradas cercanas
 
             Cuando te mande una lista de paradas, contestá el número de opción (1, 2...) y
@@ -86,6 +89,7 @@ public class RespondedorDirecto {
     private final RecorridoService recorridoService;
     private final BusEnVivoService busEnVivoService;
     private final HorarioTeoricoService horarioTeoricoService;
+    private final ConectividadService conectividadService;
     private final GuardiaDeArribos guardiaDeArribos;
 
     /** La última lista de paradas que vio cada charla, para poder elegir por número de opción. */
@@ -173,6 +177,9 @@ public class RespondedorDirecto {
         final String[] palabras = texto.split("\\s+", 2);
         if (palabras.length == 2 && esComandoDeLinea(palabras[0])) {
             return linea(palabras[1]);
+        }
+        if (palabras.length == 2 && palabras[0].equalsIgnoreCase("conectividad")) {
+            return conectividad(palabras[1]);
         }
         return busqueda(charla, texto);
     }
@@ -348,6 +355,35 @@ public class RespondedorDirecto {
 
     private static String metros(int total) {
         return total < 1000 ? total + " m" : String.format(Locale.ROOT, "%.1f km", total / 1000.0);
+    }
+
+    /** El índice de conectividad, contado como para un chat. */
+    private String conectividad(String lugar) {
+        final Optional<Coordenada> punto = viajeService.ubicar(lugar);
+        if (punto.isEmpty()) {
+            return "No pude ubicar \"" + lugar + "\". Probá con una dirección con número o un "
+                    + "cruce de calles: conectividad gabriel pereira 2470";
+        }
+        final Conectividad indice = conectividadService.medir(punto.get());
+        if (indice.sinParadasCerca()) {
+            return "Esa zona no tiene ninguna parada a menos de 400 m: conectividad 0/100. "
+                    + "Compartime una ubicación y te muestro las paradas más cercanas, aunque "
+                    + "queden lejos.";
+        }
+        final StringBuilder sb = new StringBuilder("🚏 Conectividad: ")
+                .append(indice.puntaje()).append("/100 (").append(indice.nivel()).append(")\n\n")
+                .append("· parada más cercana a ").append(indice.metrosALaParadaMasCercana()).append(" m\n")
+                .append("· ").append(indice.lineas().size()).append(" líneas: ")
+                .append(String.join(", ", indice.lineas())).append('\n');
+        if (indice.esperaMediaDiurnaMinutos() != null) {
+            sb.append("· de día sale un bondi cada ~").append(indice.esperaMediaDiurnaMinutos())
+                    .append(" min\n");
+            sb.append("· de noche (23 a 05): ").append(indice.salidasNocturnasSemanales())
+                    .append(" salidas por semana\n");
+        }
+        sb.append("· sin transbordo llegás a ").append(indice.paradasAlcanzables())
+                .append(" paradas (").append(indice.porcentajeAlcanzable()).append("% de la ciudad)");
+        return sb.toString();
     }
 
     private String busqueda(Charla charla, String texto) {

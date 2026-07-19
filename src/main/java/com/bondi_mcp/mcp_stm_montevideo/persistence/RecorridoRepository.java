@@ -130,6 +130,21 @@ public interface RecorridoRepository extends JpaRepository<RecorridoEntity, Long
     Optional<TramoEnRecorrido> tramoEnRecorrido(@Param("linea") String linea,
             @Param("subida") long subida, @Param("bajada") long bajada);
 
+    /**
+     * A cuántas paradas distintas de la ciudad se llega SIN transbordo subiendo en alguna de las
+     * paradas dadas.
+     *
+     * <p>Es la métrica de alcance del índice de conectividad: mide adónde te lleva la esquina,
+     * no cuántos bondis pasan. Usa el orden real de los recorridos, igual que el planificador.
+     */
+    @Query(value = """
+            SELECT count(DISTINCT d.codigo_parada)
+            FROM recorrido_parada o
+            JOIN recorrido_parada d ON d.recorrido_id = o.recorrido_id AND d.orden > o.orden
+            WHERE o.codigo_parada IN (:origenes)
+            """, nativeQuery = true)
+    long paradasAlcanzablesDesde(@Param("origenes") List<Long> origenes);
+
     /** Los códigos de parada de un pedazo de recorrido, en orden. */
     @Query(value = """
             SELECT codigo_parada FROM recorrido_parada

@@ -21,8 +21,10 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.domain.SalidaTeorica;
 import com.bondi_mcp.mcp_stm_montevideo.domain.TipoDia;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Viaje;
+import com.bondi_mcp.mcp_stm_montevideo.domain.Conectividad;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
+import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -61,6 +63,7 @@ public class TransporteMcpTools {
     private final HorarioTeoricoService horarioTeoricoService;
     private final RecorridoService recorridoService;
     private final BusEnVivoService busEnVivoService;
+    private final ConectividadService conectividadService;
 
     @McpTool(name = "buscar_paradas",
             description = """
@@ -554,8 +557,85 @@ public class TransporteMcpTools {
                 a él, pedile la parada (o buscala con buscar_paradas) y usá consultar_arribos.""";
     }
 
+    @McpTool(name = "conectividad",
+            description = """
+                    Mide qué tan bien servida por ómnibus está una dirección de Montevideo, con \
+                    un puntaje de 0 a 100 y sus componentes: distancia a la parada más cercana, \
+                    líneas distintas, cada cuántos minutos sale un bondi de día, servicio \
+                    nocturno y a qué parte de la ciudad se llega sin transbordo.
+
+                    Sirve para preguntas de decisión, no de viaje: "¿me conviene mudarme a X?", \
+                    "¿está bien conectado este apartamento?", "¿qué zona tiene mejor transporte?". \
+                    Para saber cómo ir de un lado a otro está como_llego.""")
+    public RespuestaConectividad conectividad(
+            @McpToolParam(description = "Dirección, cruce de calles o lugar a evaluar",
+                    required = true) String lugar) {
+
+        final Optional<Coordenada> punto;
+        try {
+            punto = viajeService.ubicar(lugar);
+        }
+        catch (TransportePublicoException ex) {
+            log.warn("Falló la conectividad de '{}': {}", lugar, ex.getMessage());
+            return new RespuestaConectividad(lugar, null, SIN_DATOS_DE_PARADAS);
+        }
+        if (punto.isEmpty()) {
+            return new RespuestaConectividad(lugar, null,
+                    "No se pudo ubicar \"" + lugar + "\" en Montevideo. Verificalo con "
+                            + "buscar_paradas o pedile al usuario que aclare la dirección.");
+        }
+
+        final Conectividad conectividad = conectividadService.medir(punto.get());
+        return new RespuestaConectividad(lugar, IndiceDeConectividad.desde(conectividad),
+                contextoDeConectividad(conectividad));
+    }
+
+    private static String contextoDeConectividad(Conectividad conectividad) {
+        if (conectividad.sinParadasCerca()) {
+            return "No hay ninguna parada a menos de 400 m de ese punto: para el STM es una zona "
+                    + "sin servicio caminable. Decíselo claro al usuario; puede que haya paradas "
+                    + "más lejos, que podés explorar con paradas_cercanas.";
+        }
+        return """
+                El puntaje sale de cuatro componentes: cercanía de la parada (0-25), variedad de \
+                líneas (0-25), frecuencia diurna (0-30) y alcance sin transbordo (0-20). Es una \
+                medida del SERVICIO PROGRAMADO, no del tránsito de hoy. Si esperaMediaDiurna \
+                viene null, los horarios aún no se importaron y el puntaje está incompleto: \
+                decilo. Las distancias son en línea recta. Presentale al usuario el nivel y dos \
+                o tres datos concretos, no la lista entera de números.""";
+    }
+
     /** Parada devuelta por la búsqueda. */
     public record ParadaEncontrada(long codigo, String descripcion, Double latitud, Double longitud) {
+    }
+
+    /** El índice de conectividad, con los datos que justifican el puntaje. */
+    public record IndiceDeConectividad(int puntaje, String nivel, int paradasCercanas,
+            Integer metrosALaParadaMasCercana, List<String> lineas, int salidasSemanales,
+            Integer esperaMediaDiurnaMinutos, int salidasNocturnasSemanales,
+            long paradasAlcanzablesSinTransbordo, int porcentajeDeLaCiudadAlcanzable) {
+
+        public IndiceDeConectividad {
+            lineas = List.copyOf(lineas);
+        }
+
+        static IndiceDeConectividad desde(Conectividad conectividad) {
+            return new IndiceDeConectividad(
+                    conectividad.puntaje(),
+                    conectividad.nivel(),
+                    conectividad.paradasCercanas(),
+                    conectividad.metrosALaParadaMasCercana(),
+                    conectividad.lineas(),
+                    conectividad.salidasSemanales(),
+                    conectividad.esperaMediaDiurnaMinutos(),
+                    conectividad.salidasNocturnasSemanales(),
+                    conectividad.paradasAlcanzables(),
+                    conectividad.porcentajeAlcanzable());
+        }
+    }
+
+    /** Resultado de conectividad. {@code indice} viene null si el lugar no se pudo ubicar. */
+    public record RespuestaConectividad(String lugar, IndiceDeConectividad indice, String contexto) {
     }
 
     /** Una salida programada ya resuelta a fecha y hora reales. */

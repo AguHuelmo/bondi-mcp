@@ -71,6 +71,46 @@ public class HorarioTeoricoDao {
         return porDia;
     }
 
+    /**
+     * Cuánto servicio tiene cada línea en cada una de las paradas dadas.
+     *
+     * <p>Es la materia prima del índice de conectividad: cuántas salidas por semana hay, cuántas
+     * en el día hábil diurno (07:00–22:00) y cuántas de noche. Las semanales cuentan el día
+     * hábil por cinco; la trasnoche (minuto ≥ 1440) y la madrugada temprana cuentan como noche.
+     */
+    public List<Frecuencia> frecuencias(List<Long> codigosParada) {
+        if (codigosParada.isEmpty()) {
+            return List.of();
+        }
+        final String placeholders = String.join(",", java.util.Collections.nCopies(codigosParada.size(), "?"));
+        return jdbcTemplate.query("""
+                SELECT codigo_parada, linea,
+                       SUM(CASE WHEN tipo_dia = 'HABIL' THEN 5 ELSE 1 END) AS semanales,
+                       SUM(CASE WHEN tipo_dia = 'HABIL' AND minuto BETWEEN 420 AND 1320
+                           THEN 1 ELSE 0 END) AS diurnas_habil,
+                       SUM(CASE WHEN minuto >= 1380 OR minuto <= 300
+                           THEN CASE WHEN tipo_dia = 'HABIL' THEN 5 ELSE 1 END
+                           ELSE 0 END) AS nocturnas
+                FROM horario_teorico
+                WHERE codigo_parada IN (%s)
+                GROUP BY codigo_parada, linea
+                """.formatted(placeholders),
+                (rs, fila) -> new Frecuencia(rs.getLong(1), rs.getString(2), rs.getInt(3),
+                        rs.getInt(4), rs.getInt(5)),
+                codigosParada.toArray());
+    }
+
+    /**
+     * El servicio de una línea en una parada.
+     *
+     * @param salidasSemanales      salidas totales en una semana tipo
+     * @param salidasDiurnasHabil   salidas de UN día hábil entre 07:00 y 22:00
+     * @param salidasNocturnasSemanales salidas semanales entre 23:00 y 05:00
+     */
+    public record Frecuencia(long codigoParada, String linea, int salidasSemanales,
+            int salidasDiurnasHabil, int salidasNocturnasSemanales) {
+    }
+
     public void borrarTodo() {
         jdbcTemplate.update("DELETE FROM horario_teorico");
     }
