@@ -1,10 +1,13 @@
 # mcp-stm-montevideo
 
-Datos de los ómnibus de Montevideo, expuestos de dos formas sobre la misma lógica:
+Datos de los ómnibus de Montevideo, expuestos de tres formas sobre la misma lógica:
 
 - **Servidor MCP** (Model Context Protocol), para que agentes de IA como Claude puedan buscar
   paradas y consultar cuándo llega el próximo bondi.
 - **API REST**, que consume el frontend React incluido.
+- **Bot de Telegram** (opcional): le mandás un número de parada, un cruce o tu ubicación y te
+  contesta con datos reales. Funciona sin ningún LLM (gratis por mensaje); con una API key de
+  Anthropic pasa a entender lenguaje natural.
 
 Los datos salen de la [API pública de la Intendencia de Montevideo](https://api.montevideo.gub.uy),
 la misma que usa la app *Cómo Ir*.
@@ -17,6 +20,10 @@ la misma que usa la app *Cómo Ir*.
 | Próximos arribos, y todas las líneas de la parada | `consultar_arribos` | `GET /api/paradas/{codigo}/arribos` |
 | Paradas más cercanas a un punto | `paradas_cercanas` | `GET /api/paradas/cercanas?lat=&lon=` |
 | Cómo ir de un lugar a otro, con o sin transbordo | `como_llego` | `GET /api/viajes?origen=&destino=` |
+| Horarios teóricos de una línea en una parada | `horarios_teoricos` | `GET /api/paradas/{codigo}/lineas/{linea}/horarios` |
+| Próxima salida programada, con la trasnoche ya resuelta | `proxima_salida` | — |
+| El recorrido completo de una línea, por sentido | `recorrido_de_linea` | `GET /api/lineas/{linea}/recorridos` |
+| Dónde está cada coche de una línea, en vivo | `buses_en_vivo` | `GET /api/lineas/{linea}/buses` |
 
 La búsqueda es tolerante a errores: puntúa por palabras coincidentes en vez de exigirlas todas, y
 si el cruce que pediste no tiene parada, **estima dónde queda y te ofrece las más cercanas con la
@@ -169,6 +176,48 @@ preguntarle cosas como *"¿cuándo pasa el próximo bondi por 18 de julio y ejid
 
 Si tu versión de Claude Desktop soporta conectores personalizados por URL, también podés apuntarlo
 directo a `http://localhost:8080/mcp` desde Settings → Connectors.
+
+## 7. El bot de Telegram (opcional)
+
+Con solo un token de [@BotFather](https://t.me/BotFather) la app levanta un bot que responde
+sobre la misma capa de servicio del MCP. No hay webhook ni puerto público: escucha por long
+polling, así que corre desde cualquier máquina con internet.
+
+```yaml
+# config/application.yaml
+bot:
+  telegram:
+    token: 123456789:tu-token-de-botfather
+```
+
+`./gradlew bootRun` y escribile. El **modo comandos** (el por defecto) no usa ningún LLM: cada
+mensaje cuesta cero y se puede dejar público sin miedo. Entiende:
+
+| Mandás | Recibís |
+|---|---|
+| `3977` (el código del cartel) | los próximos arribos de esa parada |
+| `3977 185` | las próximas salidas programadas de la 185 por ahí |
+| `18 de julio y ejido` | las paradas de ese cruce (o las más cercanas si no hay) |
+| `estadio centenario > pocitos` | qué línea tomar, dónde subir y dónde bajar |
+| `linea 185` | el recorrido y cuántos coches andan ahora |
+| `avisame 3977 185` | un aviso cuando la 185 esté a 5 min o menos de esa parada |
+| `avisame 3977 185 10` | lo mismo pero con 10 minutos de anticipación |
+| `alertas` / `cancelar` | ver o cortar tus alertas activas |
+| tu ubicación con el clip 📎 | las paradas más cercanas con la distancia |
+
+Las alertas son la gracia del bot: en vez de mirar la app parado en la esquina, le pedís que te
+avise y seguís con lo tuyo. La guardia revisa los arribos cada 30 segundos (una sola consulta
+por parada vigilada, tenga una alerta o diez), avisa una única vez y se apaga sola; si en 45
+minutos la línea nunca se acercó, también te lo dice en vez de morir en silencio. Viven en
+memoria: un reinicio las pierde, y volver a pedirla cuesta un mensaje.
+
+**Extra opcional**: con una API key de Anthropic en `bot.claude.api-key`, el bot pasa a modo
+lenguaje natural — Claude decide qué herramienta llamar (las mismas ocho del MCP) y podés
+escribirle "¿cuándo pasa la 405 por 18 y Ejido?" como a una persona. Ojo: cada mensaje llama a
+la API de Anthropic y lo pagás vos, así que es para uso propio o demos, no para abrirlo al
+público.
+
+El historial de cada chat vive en memoria y se pierde al reiniciar.
 
 ## Tests
 

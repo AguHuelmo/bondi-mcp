@@ -25,3 +25,22 @@ montevideo:
   api:
     client-id: tu-client-id
     client-secret: tu-client-secret
+
+# --- Bot de Telegram (opcional) ---
+#
+# Con solo el token de @BotFather la app levanta un bot de Telegram en "modo comandos": responde
+# arribos, busquedas, horarios y viajes sin ningun LLM, o sea sin ningun costo por mensaje.
+# Apto para dejarlo publico.
+#
+#   1. Habla con @BotFather en Telegram, crea un bot y copia el token.
+#
+# bot:
+#   telegram:
+#     token: 123456789:tu-token-de-botfather
+#
+# Extra opcional: con una API key de Anthropic (https://platform.claude.com) el bot pasa a
+# entender lenguaje natural ("¿cuando pasa la 405 por 18 y Ejido?"). Cada mensaje llama a
+# Claude y lo pagas vos: es para uso propio o demos, no para abrirlo al mundo.
+#
+#   claude:
+#     api-key: sk-ant-tu-api-key

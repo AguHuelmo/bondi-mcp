@@ -57,6 +57,19 @@ montevideo:
     # Cubre todo el país: sin esto una calle homónima se resuelve en otro departamento.
     departamento: MONTEVIDEO
 
+# Bot de Telegram (opcional). Con solo el token ya funciona en modo comandos: sin LLM, sin
+# ningún costo por mensaje, apto para dejarlo público. La API key de Anthropic es un extra que
+# lo hace entender lenguaje natural; cada mensaje pasa por Claude y lo pagás vos, así que es
+# para uso propio o demos, no para abrirlo al mundo.
+bot:
+  telegram:
+    # Token de @BotFather. En local va en config/application.yaml, nunca acá.
+    token: ${TELEGRAM_BOT_TOKEN:}
+  claude:
+    # Opcional. API key de Anthropic (https://platform.claude.com). Misma regla que arriba.
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-opus-4-8
+
 logging:
   level:
     com.bondi_mcp.mcp_stm_montevideo: INFO

@@ -30,6 +30,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-restclient'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+	// Bot de Telegram: el agente conversacional llama a Claude con el SDK oficial de Anthropic.
+	implementation 'com.anthropic:anthropic-java:2.34.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
