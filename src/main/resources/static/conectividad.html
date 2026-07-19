@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conectividad STM</title>
+<style>
+  /*
+   * Widget embebible del índice de conectividad. Autocontenido a propósito: se sirve desde el
+   * mismo backend que la API (mismo origen, sin CORS) y se embebe con un <iframe> desde
+   * cualquier sitio. Parámetros: ?query=<dirección> (o ?lat=&lon=) y ?tema=claro|oscuro|auto.
+   */
+  :root { color-scheme: light; }
+
+  .widget {
+    /* Tokens del tema claro. El oscuro los pisa con [data-tema="oscuro"]. */
+    --surface: #fcfcfb;
+    --tinta: #0b0b0b;
+    --tinta-2: #52514e;
+    --tinta-suave: #898781;
+    --borde: rgba(11, 11, 11, 0.10);
+    --acento: #2a78d6;      /* nivel bueno: el acento de la marca, no un semáforo */
+    --advertencia: #fab219; /* regular */
+    --serio: #ec835a;       /* baja */
+    --critico: #d03b3b;     /* sin servicio / muy baja */
+  }
+  [data-tema="oscuro"] .widget {
+    --surface: #1a1a19;
+    --tinta: #ffffff;
+    --tinta-2: #c3c2b7;
+    --tinta-suave: #898781;
+    --borde: rgba(255, 255, 255, 0.10);
+    --acento: #3987e5;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: transparent;
+  }
+
+  .widget {
+    background: var(--surface);
+    color: var(--tinta);
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 14px 16px 10px;
+    max-width: 420px;
+    min-width: 240px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cabecera { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .marca {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--tinta-suave); text-transform: uppercase; white-space: nowrap;
+  }
+  .lugar {
+    font-size: 12px; color: var(--tinta-2); text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .hero { display: flex; align-items: baseline; gap: 10px; }
+  .valor { font-size: 48px; font-weight: 650; line-height: 1; }
+  .de-cien { font-size: 15px; color: var(--tinta-suave); }
+  .nivel { font-size: 15px; font-weight: 600; margin-left: auto; }
+
+  .medidor {
+    height: 8px; border-radius: 4px; overflow: hidden;
+    background: color-mix(in srgb, var(--color-nivel, var(--acento)) 18%, var(--surface));
+  }
+  .medidor__relleno {
+    height: 100%; width: 0; border-radius: 4px;
+    background: var(--color-nivel, var(--acento));
+    transition: width 400ms ease;
+  }
+
+  .datos {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;
+    font-size: 12.5px;
+  }
+  .datos div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .datos dt { color: var(--tinta-suave); font-size: 10.5px; }
+  .datos dd { color: var(--tinta); font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .estado { font-size: 13px; color: var(--tinta-2); padding: 14px 0 18px; }
+
+  .pie {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 10px; color: var(--tinta-suave);
+    border-top: 1px solid var(--borde); padding-top: 7px;
+  }
+  .pie a { color: inherit; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <main class="widget" id="widget" aria-busy="true">
+    <header class="cabecera">
+      <span class="marca">Conectividad&nbsp;STM</span>
+      <span class="lugar" id="lugar"></span>
+    </header>
+
+    <section class="hero" id="hero" hidden>
+      <span class="valor" id="valor">–</span>
+      <span class="de-cien">/100</span>
+      <span class="nivel" id="nivel"></span>
+    </section>
+
+    <div class="medidor" id="medidor" hidden
+         role="meter" aria-valuemin="0" aria-valuemax="100" aria-label="Índice de conectividad">
+      <div class="medidor__relleno" id="relleno"></div>
+    </div>
+
+    <dl class="datos" id="datos" hidden>
+      <div><dt>Parada más cercana</dt><dd id="dato-parada">–</dd></div>
+      <div><dt>Líneas de ómnibus</dt><dd id="dato-lineas">–</dd></div>
+      <div><dt>Frecuencia diurna</dt><dd id="dato-frecuencia">–</dd></div>
+      <div><dt>Sin transbordo llegás a</dt><dd id="dato-alcance">–</dd></div>
+    </dl>
+
+    <p class="estado" id="estado">Midiendo la zona…</p>
+
+    <footer class="pie">
+      <span>Transporte público de Montevideo</span>
+      <span>Datos: STM · IM</span>
+    </footer>
+  </main>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+
+  // El tema lo elige la página que embebe: un widget no debe volverse oscuro solo dentro de
+  // un sitio claro. "auto" queda para quien sí quiera seguir al sistema.
+  const tema = params.get('tema') || 'claro';
+  const oscuro = tema === 'oscuro'
+      || (tema === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  if (oscuro) {
+    document.documentElement.dataset.tema = 'oscuro';
+    document.documentElement.style.colorScheme = 'dark';
+  }
+
+  const query = (params.get('query') || params.get('direccion') || '').trim();
+  const lat = params.get('lat');
+  const lon = params.get('lon');
+
+  function mostrarEstado(mensaje) {
+    $('estado').textContent = mensaje;
+    $('estado').hidden = false;
+    $('widget').setAttribute('aria-busy', 'false');
+  }
+
+  // El color del medidor comunica el nivel; el texto del nivel va SIEMPRE al lado, en tinta,
+  // para que el color nunca cargue solo con el significado.
+  function colorDe(puntaje) {
+    const estilos = getComputedStyle($('widget'));
+    if (puntaje >= 60) return estilos.getPropertyValue('--acento');
+    if (puntaje >= 40) return estilos.getPropertyValue('--advertencia');
+    if (puntaje >= 20) return estilos.getPropertyValue('--serio');
+    return estilos.getPropertyValue('--critico');
+  }
+
+  function pintar(indice) {
+    $('valor').textContent = indice.puntaje;
+    $('nivel').textContent = indice.nivel;
+    $('widget').style.setProperty('--color-nivel', colorDe(indice.puntaje).trim());
+    $('medidor').setAttribute('aria-valuenow', indice.puntaje);
+    $('medidor').setAttribute('aria-valuetext', indice.puntaje + ' de 100, ' + indice.nivel);
+    $('hero').hidden = false;
+    $('medidor').hidden = false;
+
+    if (indice.paradasCercanas === 0) {
+      mostrarEstado('No hay paradas de ómnibus a menos de 400 metros de este punto.');
+    } else {
+      $('dato-parada').textContent = 'a ' + indice.metrosALaParadaMasCercana + ' m';
+      $('dato-lineas').textContent = indice.lineas.length + ' (' + indice.lineas.slice(0, 5).join(', ')
+          + (indice.lineas.length > 5 ? '…' : '') + ')';
+      $('dato-frecuencia').textContent = indice.esperaMediaDiurnaMinutos == null
+          ? 'sin datos'
+          : 'un bondi cada ~' + indice.esperaMediaDiurnaMinutos + ' min';
+      $('dato-alcance').textContent = indice.porcentajeDeLaCiudadAlcanzable + '% de la ciudad';
+      $('datos').hidden = false;
+      $('estado').hidden = true;
+      $('widget').setAttribute('aria-busy', 'false');
+    }
+
+    // El ancho al final, para que la transición se vea al cargar.
+    requestAnimationFrame(() => { $('relleno').style.width = indice.puntaje + '%'; });
+  }
+
+  async function cargar() {
+    let url;
+    if (lat !== null && lon !== null) {
+      url = '/api/conectividad/punto?lat=' + encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon);
+    } else if (query !== '') {
+      url = '/api/conectividad?query=' + encodeURIComponent(query);
+      $('lugar').textContent = query;
+      $('lugar').title = query;
+    } else {
+      mostrarEstado('Falta la dirección: agregá ?query=tu dirección a la URL del widget.');
+      return;
+    }
+
+    try {
+      const respuesta = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (respuesta.status === 404) {
+        mostrarEstado('No pudimos ubicar esa dirección en Montevideo.');
+        return;
+      }
+      if (!respuesta.ok) {
+        mostrarEstado('El índice no está disponible en este momento.');
+        return;
+      }
+      pintar(await respuesta.json());
+    } catch (error) {
+      mostrarEstado('El índice no está disponible en este momento.');
+    }
+  }
+
+  cargar();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conectividad STM — demo para portales inmobiliarios</title>
+<style>
+  /* Página de demostración del widget embebible. Se sirve junto al backend:
+     http://localhost:8080/demo-conectividad.html */
+  :root {
+    --plano: #f9f9f7;
+    --surface: #fcfcfb;
+    --tinta: #0b0b0b;
+    --tinta-2: #52514e;
+    --tinta-suave: #898781;
+    --borde: rgba(11, 11, 11, 0.10);
+    --acento: #2a78d6;
+    color-scheme: light;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--plano);
+    color: var(--tinta);
+    line-height: 1.55;
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 40px 20px 72px; }
+
+  h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.01em; }
+  .bajada { color: var(--tinta-2); font-size: 16px; margin-top: 10px; max-width: 60ch; }
+
+  section { margin-top: 44px; }
+  h2 { font-size: 18px; margin-bottom: 4px; }
+  .nota-seccion { color: var(--tinta-2); font-size: 14px; margin-bottom: 16px; max-width: 65ch; }
+
+  .tarjeta {
+    background: var(--surface);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  /* Probador */
+  .probador { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .probador input {
+    flex: 1; min-width: 220px;
+    font: inherit; font-size: 15px;
+    padding: 9px 12px;
+    border: 1px solid var(--borde); border-radius: 8px;
+    background: var(--surface); color: var(--tinta);
+  }
+  .probador button {
+    font: inherit; font-size: 15px; font-weight: 600;
+    padding: 9px 18px; border: 0; border-radius: 8px;
+    background: var(--acento); color: #fff; cursor: pointer;
+  }
+  .probador button:hover { filter: brightness(1.08); }
+  .ejemplos { font-size: 13px; color: var(--tinta-suave); margin-bottom: 16px; }
+  .ejemplos button {
+    font: inherit; font-size: 12.5px; color: var(--tinta-2);
+    background: transparent; border: 1px solid var(--borde); border-radius: 999px;
+    padding: 3px 10px; margin: 0 4px 4px 0; cursor: pointer;
+  }
+  .ejemplos button:hover { border-color: var(--tinta-suave); }
+
+  iframe.widget { border: 0; width: 380px; max-width: 100%; height: 248px; display: block; }
+
+  details.json { margin-top: 14px; font-size: 13px; }
+  details.json summary { color: var(--tinta-2); cursor: pointer; }
+  details.json pre {
+    margin-top: 8px; padding: 12px;
+    background: var(--plano); border: 1px solid var(--borde); border-radius: 8px;
+    font-size: 12px; overflow-x: auto;
+  }
+
+  /* Publicación de ejemplo */
+  .publicacion { max-width: 420px; overflow: hidden; padding: 0; }
+  .publicacion .foto {
+    height: 150px;
+    background: linear-gradient(135deg, #d7e4f4 0%, #b9cfe8 55%, #9fbcd9 100%);
+    display: grid; place-items: center;
+    color: #4a6a8a; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .publicacion .cuerpo { padding: 16px 18px 18px; }
+  .publicacion .precio { font-size: 20px; font-weight: 700; }
+  .publicacion .titulo { font-size: 15px; color: var(--tinta-2); margin-top: 2px; }
+  .publicacion .detalles { font-size: 13px; color: var(--tinta-suave); margin-top: 6px; }
+  .publicacion .separador { border: 0; border-top: 1px solid var(--borde); margin: 14px 0; }
+  .publicacion .etiqueta-transporte {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
+    color: var(--tinta-suave); text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  /* Integración */
+  pre.snippet {
+    background: #1a1a19; color: #e8e6df;
+    padding: 16px; border-radius: 10px;
+    font-size: 12.5px; line-height: 1.6; overflow-x: auto;
+  }
+  .fila-copiar { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .fila-copiar button {
+    font: inherit; font-size: 13px;
+    padding: 6px 14px; border: 1px solid var(--borde); border-radius: 8px;
+    background: var(--surface); cursor: pointer;
+  }
+
+  /* Cómo se calcula */
+  .componentes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .componente { background: var(--surface); border: 1px solid var(--borde); border-radius: 10px; padding: 14px; }
+  .componente b { display: block; font-size: 14px; }
+  .componente span { font-size: 12.5px; color: var(--tinta-2); }
+  .puntos { font-size: 11px; color: var(--tinta-suave); float: right; }
+
+  .letra-chica { font-size: 12.5px; color: var(--tinta-suave); margin-top: 16px; max-width: 70ch; }
+</style>
+</head>
+<body>
+<main>
+  <h1>¿Qué tan bien conectada está esta propiedad?</h1>
+  <p class="bajada">
+    Un puntaje de 0 a 100 del transporte público de cada dirección de Montevideo, listo para
+    embeber en cualquier publicación. Calculado con los datos abiertos del STM: paradas,
+    recorridos y horarios reales. El dato que el interesado se pregunta y ningún portal contesta.
+  </p>
+
+  <section>
+    <h2>Probalo con cualquier dirección</h2>
+    <p class="nota-seccion">Una dirección con número, un cruce de calles o un lugar conocido.</p>
+    <div class="tarjeta">
+      <form class="probador" id="probador">
+        <input id="direccion" type="text" value="21 de setiembre 2800"
+               placeholder="ej: 21 de setiembre 2800" aria-label="Dirección a evaluar">
+        <button type="submit">Medir</button>
+      </form>
+      <p class="ejemplos">Probá:
+        <button type="button" data-q="18 de julio y ejido">18 de julio y ejido</button>
+        <button type="button" data-q="gral flores 4200">gral flores 4200</button>
+        <button type="button" data-q="rambla republica de mexico 5500">rambla rep. de méxico 5500</button>
+        <button type="button" data-q="camino maldonado km 24">camino maldonado km 24</button>
+      </p>
+      <iframe class="widget" id="widget" src="conectividad.html?query=21%20de%20setiembre%202800"
+              title="Índice de conectividad"></iframe>
+      <details class="json" id="detalle-json">
+        <summary>Ver la respuesta JSON de la API</summary>
+        <pre id="json">–</pre>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <h2>Así se ve en una publicación</h2>
+    <p class="nota-seccion">
+      El widget vive en un iframe: no toca el CSS ni el JavaScript del portal, y carga en
+      diferido sin frenar la página.
+    </p>
+    <div class="tarjeta publicacion">
+      <div class="foto">Foto de la propiedad</div>
+      <div class="cuerpo">
+        <div class="precio">U$S 1.150 / mes</div>
+        <div class="titulo">Apartamento 2 dormitorios · Pocitos</div>
+        <div class="detalles">65 m² · 3er piso · garaje · gastos comunes U$S 90</div>
+        <hr class="separador">
+        <div class="etiqueta-transporte">Transporte público</div>
+        <iframe class="widget" src="conectividad.html?query=26%20de%20marzo%20y%20buxareo"
+                title="Índice de conectividad de la zona" loading="lazy"></iframe>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cómo se integra</h2>
+    <p class="nota-seccion">
+      Una línea de HTML por publicación, con la dirección del inmueble en la URL. Nada que
+      instalar ni mantener.
+    </p>
+    <pre class="snippet" id="snippet">&lt;iframe
+  src="https://TU-DOMINIO/conectividad.html?query=DIRECCION DEL INMUEBLE"
+  width="380" height="248" style="border:0" loading="lazy"
+  title="Conectividad de transporte público"&gt;&lt;/iframe&gt;</pre>
+    <div class="fila-copiar"><button id="copiar" type="button">Copiar el código</button></div>
+    <p class="letra-chica">
+      ¿Preferís tu propio diseño? La misma información está cruda en
+      <code>GET /api/conectividad?query=…</code> (JSON) para renderizarla con los componentes
+      del portal. También acepta coordenadas: <code>/api/conectividad/punto?lat=…&amp;lon=…</code>.
+      El widget soporta <code>&amp;tema=oscuro</code> para sitios con fondo oscuro.
+    </p>
+  </section>
+
+  <section>
+    <h2>Cómo se calcula</h2>
+    <div class="componentes">
+      <div class="componente"><span class="puntos">0–25</span><b>Cercanía</b>
+        <span>a cuántos metros queda la parada más próxima</span></div>
+      <div class="componente"><span class="puntos">0–25</span><b>Variedad</b>
+        <span>cuántas líneas distintas sirven la zona</span></div>
+      <div class="componente"><span class="puntos">0–30</span><b>Frecuencia</b>
+        <span>cada cuántos minutos sale un ómnibus en un día hábil, de 7 a 22</span></div>
+      <div class="componente"><span class="puntos">0–20</span><b>Alcance</b>
+        <span>a qué parte de la ciudad se llega sin transbordo</span></div>
+    </div>
+    <p class="letra-chica">
+      Fuentes: paradas y GTFS oficial del STM (Intendencia de Montevideo) y padrón nacional de
+      direcciones (IDE). Las distancias son en línea recta; el índice mide el servicio
+      programado, no el tránsito del momento. Se recalcula con cada actualización del GTFS.
+    </p>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  function medir(direccion) {
+    const limpia = direccion.trim();
+    if (limpia === '') {
+      return;
+    }
+    $('direccion').value = limpia;
+    $('widget').src = 'conectividad.html?query=' + encodeURIComponent(limpia);
+    $('json').textContent = 'Cargando…';
+    fetch('/api/conectividad?query=' + encodeURIComponent(limpia), {
+      headers: { Accept: 'application/json' },
+    })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((cuerpo) => { $('json').textContent = JSON.stringify(cuerpo, null, 2); })
+        .catch((error) => {
+          $('json').textContent = error.message === '404'
+              ? 'No se pudo ubicar esa dirección (404).'
+              : 'La API no respondió. ¿Está levantado el backend?';
+        });
+  }
+
+  $('probador').addEventListener('submit', (evento) => {
+    evento.preventDefault();
+    medir($('direccion').value);
+  });
+
+  document.querySelectorAll('.ejemplos button').forEach((boton) => {
+    boton.addEventListener('click', () => medir(boton.dataset.q));
+  });
+
+  $('copiar').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('snippet').textContent);
+      $('copiar').textContent = '¡Copiado!';
+      setTimeout(() => { $('copiar').textContent = 'Copiar el código'; }, 1500);
+    } catch (error) {
+      // Sin permiso de portapapeles: seleccionar el bloque ya deja el copiado a un cmd+C.
+      getSelection().selectAllChildren($('snippet'));
+    }
+  });
+
+  medir($('direccion').value);
+})();
+</script>
+</body>
+</html>

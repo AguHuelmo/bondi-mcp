@@ -33,6 +33,11 @@ se llega sin transbordo (0–20)— calculados enteramente con datos propios (pa
 horarios del GTFS), sin ninguna llamada externa. Pensado para embeberse donde una dirección
 importa: portales inmobiliarios, análisis urbano, decidir dónde poner un local.
 
+Con el backend corriendo hay una **demo lista para mostrar** en
+<http://localhost:8080/demo-conectividad.html>: el widget embebible
+(`/conectividad.html?query=...`, un iframe por publicación), cómo queda dentro de un aviso, y
+el código de integración para copiar.
+
 La búsqueda es tolerante a errores: puntúa por palabras coincidentes en vez de exigirlas todas, y
 si el cruce que pediste no tiene parada, **estima dónde queda y te ofrece las más cercanas con la
 distancia**. Buscar "gabriel pereira y chucarro" —un cruce que no existe— devuelve la parada de
