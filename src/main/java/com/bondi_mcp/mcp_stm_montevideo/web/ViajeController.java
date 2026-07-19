@@ -13,6 +13,8 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
 import com.bondi_mcp.mcp_stm_montevideo.service.ViajeService;
 import com.bondi_mcp.mcp_stm_montevideo.web.dto.ViajeResponse;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 
@@ -55,8 +57,8 @@ public class ViajeController {
     /** Variante por coordenadas, para cuando el origen sale del GPS. */
     @GetMapping("/desde-punto")
     public ResponseEntity<List<ViajeResponse>> desdePunto(
-            @RequestParam("lat") double lat,
-            @RequestParam("lon") double lon,
+            @RequestParam("lat") @Min(-90) @Max(90) double lat,
+            @RequestParam("lon") @Min(-180) @Max(180) double lon,
             @RequestParam("destino") @NotBlank String destino) {
 
         final var hasta = viajeService.ubicar(destino);

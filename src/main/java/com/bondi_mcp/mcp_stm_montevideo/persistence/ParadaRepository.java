@@ -74,4 +74,16 @@ public interface ParadaRepository extends JpaRepository<ParadaEntity, Long> {
 
     @Query("SELECT MAX(p.actualizado) FROM ParadaEntity p")
     Optional<Instant> ultimaActualizacion();
+
+    /**
+     * Toma un lock consultivo de Postgres que serializa el refresco del caché.
+     *
+     * <p>Sin esto, dos requests que encuentran el caché vencido a la vez lo refrescan los dos: el
+     * segundo borra sin ver las filas sin commitear del primero y termina insertando las mismas
+     * claves, o sea violación de unicidad y request caído. El lock es transaccional a propósito:
+     * se libera recién en el commit de quien refrescó, así que el que esperaba re-chequea la
+     * frescura ya viendo el caché nuevo y se saltea el refresco.
+     */
+    @Query(value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(:clave)) AS bloqueo", nativeQuery = true)
+    int bloquearRefresco(@Param("clave") long clave);
 }

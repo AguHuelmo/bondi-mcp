@@ -31,6 +31,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ParadaCacheService {
 
+    /** Clave del advisory lock del refresco. Arbitraria; solo tiene que ser única en la base. */
+    private static final long LOCK_REFRESCO = 727_431_954L;
+
     private final TransportePublicoClient client;
     private final ParadaRepository repository;
     private final ParadasProperties properties;
@@ -38,6 +41,12 @@ public class ParadaCacheService {
     /** Garantiza que el caché tenga datos utilizables antes de una búsqueda. */
     @Transactional
     public void asegurarCacheFresco() {
+        if (estaFresco()) {
+            return;
+        }
+        // Refresca uno solo; los demás esperan en el lock. Como el lock se suelta al commit de
+        // quien refrescó, el re-chequeo de acá abajo ya ve el caché nuevo y no repite el trabajo.
+        repository.bloquearRefresco(LOCK_REFRESCO);
         if (estaFresco()) {
             return;
         }
