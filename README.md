@@ -40,6 +40,14 @@ Con el backend corriendo hay una **demo lista para mostrar** en
 (`/conectividad.html?query=...`, un iframe por publicación), cómo queda dentro de un aviso, y
 el código de integración para copiar.
 
+Y para el otro comprador B2B está la **cartelera para pantallas**
+(<http://localhost:8080/cartelera.html>): los arribos en vivo de las paradas de la puerta, en
+tipografía de lobby, pensada para quedar semanas abierta en el televisor de un hotel o una
+recepción. Sin parámetros muestra un configurador; la URL generada es la cartelera
+(`?query=dirección` o `?paradas=3977,1234`, `&titulo=`, `&lineas=185,405` para filtrar,
+`&tema=claro`). Se actualiza sola cada 30 segundos y ante una caída de la API muestra los
+últimos datos con un aviso, nunca una pantalla rota.
+
 La búsqueda es tolerante a errores: puntúa por palabras coincidentes en vez de exigirlas todas, y
 si el cruce que pediste no tiene parada, **estima dónde queda y te ofrece las más cercanas con la
 distancia**. Buscar "gabriel pereira y chucarro" —un cruce que no existe— devuelve la parada de
@@ -320,6 +328,7 @@ Con el backend en `:8080`:
 | Historial de esperas observadas | `curl "localhost:8080/api/puntualidad?linea=185&parada=3977"` |
 | Conectividad por coordenada | `curl "localhost:8080/api/conectividad/punto?lat=-34.906&lon=-56.19"` |
 | **Demo para inmobiliarias** | abrir <http://localhost:8080/demo-conectividad.html> |
+| **Cartelera para pantallas** (hoteles, recepciones, vidrieras) | abrir <http://localhost:8080/cartelera.html> y configurarla, o directo `cartelera.html?paradas=3977&titulo=Hotel Costanera` |
 | **Widget embebible** | abrir <http://localhost:8080/conectividad.html?query=18%20de%20julio%20y%20ejido> |
 | Frontend completo (mapa, arribos, planificador) | `cd frontend && npm run dev` → <http://localhost:5173> |
 

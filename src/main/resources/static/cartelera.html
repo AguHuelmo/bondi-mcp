@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartelera STM</title>
+<style>
+  /*
+   * Cartelera de arribos para pantallas: el televisor del lobby de un hotel, la recepción de
+   * una mutualista, la vidriera de un comercio. Se abre la URL, F11, y queda: se actualiza
+   * sola cada 30 segundos y se recarga entera una vez por día para aguantar semanas prendida.
+   *
+   * Parámetros:
+   *   ?query=av brasil 2830        la dirección del local; resuelve las paradas de la puerta
+   *   ?paradas=3977,1234           o los códigos de parada, explícitos (hasta 3)
+   *   &titulo=Hotel Costanera      el nombre que encabeza la pantalla
+   *   &lineas=185,405              mostrar solo estas líneas (opcional)
+   *   &max=3                       cuántas paradas mostrar al resolver por dirección (1 a 3)
+   *   &tema=claro                  para ambientes muy iluminados; el default es oscuro
+   *
+   * Sin parámetros muestra el configurador.
+   */
+  :root { color-scheme: dark; }
+
+  body {
+    /* Tokens del tema oscuro (señalética). El claro los pisa con [data-tema="claro"]. */
+    --plano: #0d0d0d;
+    --surface: #1a1a19;
+    --tinta: #ffffff;
+    --tinta-2: #c3c2b7;
+    --tinta-suave: #898781;
+    --borde: rgba(255, 255, 255, 0.10);
+    --acento: #3987e5;
+    --inminente: #0ca30c;
+    --alerta: #e66767;
+  }
+  body[data-tema="claro"] {
+    --plano: #f9f9f7;
+    --surface: #fcfcfb;
+    --tinta: #0b0b0b;
+    --tinta-2: #52514e;
+    --tinta-suave: #898781;
+    --borde: rgba(11, 11, 11, 0.10);
+    --acento: #2a78d6;
+    --inminente: #0ca30c;
+    --alerta: #d03b3b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--plano);
+    color: var(--tinta);
+    overflow: hidden;
+  }
+
+  /* ---- La cartelera ---- */
+  .cartelera { height: 100%; display: flex; flex-direction: column; padding: 3vmin 3.5vmin; gap: 2.5vmin; }
+
+  .cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 3vmin; }
+  .cabecera h1 { font-size: 4vmin; font-weight: 700; letter-spacing: -0.01em; }
+  .cabecera .subtitulo { font-size: 2.1vmin; color: var(--tinta-2); margin-top: 0.5vmin; }
+  .reloj { text-align: right; }
+  .reloj .hora { font-size: 6.5vmin; font-weight: 650; line-height: 1; }
+  .reloj .fecha { font-size: 1.9vmin; color: var(--tinta-suave); margin-top: 0.6vmin; }
+
+  .grilla {
+    flex: 1; min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(38vmin, 1fr));
+    gap: 2.5vmin;
+  }
+
+  .parada {
+    background: var(--surface);
+    border: 1px solid var(--borde);
+    border-radius: 1.6vmin;
+    padding: 2.4vmin 2.6vmin;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .parada h2 { font-size: 2.6vmin; font-weight: 650; line-height: 1.25; }
+  .parada .codigo { font-size: 1.7vmin; color: var(--tinta-suave); margin-top: 0.4vmin; }
+
+  .arribos { list-style: none; margin-top: 2vmin; display: flex; flex-direction: column; gap: 1.2vmin; }
+  .arribo {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 2vmin;
+    padding: 1.1vmin 1.4vmin;
+    border-radius: 1vmin;
+  }
+  .arribo--inminente { background: color-mix(in srgb, var(--inminente) 12%, var(--surface)); }
+
+  .linea {
+    background: var(--acento); color: #fff;
+    font-size: 2.8vmin; font-weight: 700;
+    min-width: 8.5vmin; text-align: center;
+    padding: 0.7vmin 1.2vmin; border-radius: 0.9vmin;
+  }
+  .destino {
+    font-size: 2.3vmin; color: var(--tinta-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .espera { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .espera .numero { font-size: 4.2vmin; font-weight: 700; line-height: 1; }
+  .espera .unidad { font-size: 1.8vmin; color: var(--tinta-suave); margin-left: 0.4vmin; }
+  .espera .ya { font-size: 2.6vmin; font-weight: 700; color: var(--inminente); }
+
+  .sin-arribos { margin-top: 2.4vmin; font-size: 2.1vmin; color: var(--tinta-2); line-height: 1.5; }
+  .sin-arribos .lineas-de-la-parada { color: var(--tinta); font-weight: 600; }
+
+  .pie {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 1.8vmin; color: var(--tinta-suave);
+  }
+  .punto { display: inline-block; width: 1.1vmin; height: 1.1vmin; border-radius: 50%;
+           background: var(--inminente); margin-right: 0.8vmin; vertical-align: middle; }
+  .punto--caido { background: var(--alerta); }
+
+  /* ---- El configurador (cuando falta la config en la URL) ---- */
+  .configurador {
+    min-height: 100%; display: grid; place-items: center; padding: 24px;
+    overflow: auto;
+  }
+  .configurador form {
+    background: var(--surface); border: 1px solid var(--borde); border-radius: 14px;
+    padding: 28px; max-width: 460px; width: 100%;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .configurador h1 { font-size: 22px; }
+  .configurador p { font-size: 14px; color: var(--tinta-2); line-height: 1.5; }
+  .configurador label { font-size: 13px; color: var(--tinta-suave); display: flex; flex-direction: column; gap: 5px; }
+  .configurador input, .configurador select {
+    font: inherit; font-size: 15px; padding: 9px 12px;
+    background: var(--plano); color: var(--tinta);
+    border: 1px solid var(--borde); border-radius: 8px;
+  }
+  .configurador button {
+    font: inherit; font-size: 15px; font-weight: 600;
+    padding: 11px; border: 0; border-radius: 8px;
+    background: var(--acento); color: #fff; cursor: pointer;
+  }
+  .configurador .pista { font-size: 12.5px; color: var(--tinta-suave); }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body data-tema="oscuro">
+
+  <div class="configurador" id="configurador" hidden>
+    <form id="form">
+      <h1>Cartelera de ómnibus 🚌</h1>
+      <p>Los arribos en vivo de las paradas de tu puerta, para la pantalla del lobby o la
+         vidriera. Se configura una vez: la URL que se genera es la cartelera.</p>
+      <label>Nombre para el encabezado
+        <input id="conf-titulo" type="text" placeholder="Hotel Costanera">
+      </label>
+      <label>Dirección del local (o códigos de parada separados por coma)
+        <input id="conf-direccion" type="text" placeholder="av brasil 2830  ·  o  3977,1234" required>
+      </label>
+      <label>Tema
+        <select id="conf-tema">
+          <option value="oscuro">Oscuro (recomendado para pantallas)</option>
+          <option value="claro">Claro</option>
+        </select>
+      </label>
+      <button type="submit">Abrir la cartelera</button>
+      <span class="pista">Después: F11 para pantalla completa y listo, se actualiza sola.</span>
+    </form>
+  </div>
+
+  <div class="cartelera" id="cartelera" hidden>
+    <header class="cabecera">
+      <div>
+        <h1 id="titulo">Próximos ómnibus</h1>
+        <p class="subtitulo" id="subtitulo">En las paradas de la puerta</p>
+      </div>
+      <div class="reloj">
+        <div class="hora" id="hora">--:--</div>
+        <div class="fecha" id="fecha"></div>
+      </div>
+    </header>
+
+    <main class="grilla" id="grilla"></main>
+
+    <footer class="pie">
+      <span><span class="punto" id="punto"></span><span id="estado">Cargando…</span></span>
+      <span>Datos en vivo del STM · Intendencia de Montevideo</span>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+
+  const REFRESCO_MS = 30_000;
+  const MAXIMOS_ARRIBOS = 6;
+  const MINUTOS_INMINENTE = 3;
+
+  /* ---- Configurador ---- */
+
+  if (!params.get('paradas') && !params.get('query')) {
+    $('configurador').hidden = false;
+    $('form').addEventListener('submit', (evento) => {
+      evento.preventDefault();
+      const destino = new URLSearchParams();
+      const direccion = $('conf-direccion').value.trim();
+      if (/^[\d,\s]+$/.test(direccion)) {
+        destino.set('paradas', direccion.replace(/\s/g, ''));
+      } else {
+        destino.set('query', direccion);
+      }
+      const titulo = $('conf-titulo').value.trim();
+      if (titulo !== '') destino.set('titulo', titulo);
+      if ($('conf-tema').value !== 'oscuro') destino.set('tema', $('conf-tema').value);
+      location.search = destino.toString();
+    });
+    return;
+  }
+
+  /* ---- Cartelera ---- */
+
+  if (params.get('tema') === 'claro') {
+    document.body.dataset.tema = 'claro';
+    document.documentElement.style.colorScheme = 'light';
+  }
+  if (params.get('titulo')) {
+    $('titulo').textContent = params.get('titulo');
+    $('subtitulo').textContent = 'Próximos ómnibus en las paradas de la puerta';
+  }
+
+  const filtroDeLineas = (params.get('lineas') || '')
+      .split(',').map((l) => l.trim().toUpperCase()).filter((l) => l !== '');
+
+  let ultimaActualizacion = null;
+
+  function reloj() {
+    const ahora = new Date();
+    $('hora').textContent = ahora.toLocaleTimeString('es-UY',
+        { hour: '2-digit', minute: '2-digit', timeZone: 'America/Montevideo' });
+    $('fecha').textContent = ahora.toLocaleDateString('es-UY',
+        { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Montevideo' });
+
+    if (ultimaActualizacion !== null) {
+      const hace = Math.round((Date.now() - ultimaActualizacion) / 1000);
+      const caido = hace > 90;
+      $('punto').classList.toggle('punto--caido', caido);
+      $('estado').textContent = caido
+          ? 'Sin conexión con el STM: mostrando los últimos datos'
+          : 'Actualizado hace ' + hace + ' s';
+    }
+  }
+
+  async function pedirJson(url) {
+    const respuesta = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!respuesta.ok) throw new Error(String(respuesta.status));
+    return respuesta.json();
+  }
+
+  /** Resuelve qué paradas mostrar, una sola vez al arrancar. */
+  async function resolverParadas() {
+    if (params.get('paradas')) {
+      const codigos = params.get('paradas').split(',').map((c) => c.trim())
+          .filter((c) => /^\d+$/.test(c)).slice(0, 3);
+      return Promise.all(codigos.map(async (codigo) => {
+        // La búsqueda por código devuelve la parada con su nombre de esquinas.
+        const busqueda = await pedirJson('/api/paradas?query=' + codigo).catch(() => null);
+        const parada = busqueda && busqueda.paradas.find((p) => String(p.codigo) === codigo);
+        return { codigo: Number(codigo), nombre: parada ? parada.descripcion : 'Parada ' + codigo };
+      }));
+    }
+
+    const max = Math.min(3, Math.max(1, Number(params.get('max')) || 2));
+    const busqueda = await pedirJson('/api/paradas?query=' + encodeURIComponent(params.get('query')));
+    const candidatas = busqueda.cercanasAlPunto.length > 0 ? busqueda.cercanasAlPunto : busqueda.paradas;
+    return candidatas.slice(0, max).map((p) => ({ codigo: p.codigo, nombre: p.descripcion }));
+  }
+
+  function nodoArribo(arribo) {
+    const fila = document.createElement('li');
+    fila.className = arribo.esperaEnMinutos <= MINUTOS_INMINENTE ? 'arribo arribo--inminente' : 'arribo';
+
+    const linea = document.createElement('span');
+    linea.className = 'linea';
+    linea.textContent = arribo.linea;
+
+    const destino = document.createElement('span');
+    destino.className = 'destino';
+    destino.textContent = arribo.destino || '';
+
+    const espera = document.createElement('span');
+    espera.className = 'espera';
+    if (arribo.esperaEnMinutos <= 0) {
+      espera.innerHTML = '<span class="ya">YA</span>';
+    } else {
+      const numero = document.createElement('span');
+      numero.className = 'numero';
+      numero.textContent = arribo.esperaEnMinutos;
+      const unidad = document.createElement('span');
+      unidad.className = 'unidad';
+      unidad.textContent = 'min';
+      espera.append(numero, unidad);
+    }
+
+    fila.append(linea, destino, espera);
+    return fila;
+  }
+
+  function pintarParada(seccion, datos) {
+    seccion.querySelector('.contenido').replaceChildren();
+    const contenido = seccion.querySelector('.contenido');
+
+    const visibles = datos.arribos
+        .filter((a) => filtroDeLineas.length === 0 || filtroDeLineas.includes(a.linea.toUpperCase()))
+        .slice(0, MAXIMOS_ARRIBOS);
+
+    if (visibles.length > 0) {
+      const lista = document.createElement('ul');
+      lista.className = 'arribos';
+      visibles.forEach((arribo) => lista.append(nodoArribo(arribo)));
+      contenido.append(lista);
+      return;
+    }
+
+    const aviso = document.createElement('p');
+    aviso.className = 'sin-arribos';
+    if (datos.lineasQuePasan.length > 0) {
+      aviso.innerHTML = 'No viene ningún ómnibus en este momento.<br>Por acá pasan: '
+          + '<span class="lineas-de-la-parada"></span>';
+      aviso.querySelector('.lineas-de-la-parada').textContent = datos.lineasQuePasan.join(', ');
+    } else {
+      aviso.textContent = 'No viene ningún ómnibus en este momento.';
+    }
+    contenido.append(aviso);
+  }
+
+  async function refrescar(paradas) {
+    const resultados = await Promise.allSettled(
+        paradas.map((parada) => pedirJson('/api/paradas/' + parada.codigo + '/arribos')));
+
+    let algunaRespondio = false;
+    resultados.forEach((resultado, i) => {
+      if (resultado.status === 'fulfilled') {
+        algunaRespondio = true;
+        pintarParada($('parada-' + paradas[i].codigo), resultado.value);
+      }
+      // Si falló, la columna conserva los últimos arribos: una cartelera nunca se ve rota.
+    });
+    if (algunaRespondio) {
+      ultimaActualizacion = Date.now();
+    }
+  }
+
+  async function iniciar() {
+    $('cartelera').hidden = false;
+    reloj();
+    setInterval(reloj, 1000);
+
+    let paradas;
+    try {
+      paradas = await resolverParadas();
+    } catch (error) {
+      $('estado').textContent = 'No se pudo resolver la dirección. Revisá la URL de la cartelera.';
+      $('punto').classList.add('punto--caido');
+      return;
+    }
+    if (paradas.length === 0) {
+      $('estado').textContent = 'No se encontraron paradas para esa configuración.';
+      $('punto').classList.add('punto--caido');
+      return;
+    }
+
+    for (const parada of paradas) {
+      const seccion = document.createElement('section');
+      seccion.className = 'parada';
+      seccion.id = 'parada-' + parada.codigo;
+      const nombre = document.createElement('h2');
+      nombre.textContent = parada.nombre;
+      const codigo = document.createElement('p');
+      codigo.className = 'codigo';
+      codigo.textContent = 'Parada ' + parada.codigo;
+      const contenido = document.createElement('div');
+      contenido.className = 'contenido';
+      seccion.append(nombre, codigo, contenido);
+      $('grilla').append(seccion);
+    }
+
+    await refrescar(paradas);
+    setInterval(() => refrescar(paradas), REFRESCO_MS);
+
+    // Higiene de señalética: una pantalla queda semanas prendida; una recarga diaria entera
+    // limpia cualquier fuga y levanta versiones nuevas de la página.
+    setTimeout(() => location.reload(), 24 * 60 * 60 * 1000);
+  }
+
+  iniciar();
+})();
+</script>
+</body>
+</html>
