@@ -1,7 +1,6 @@
 package com.bondi_mcp.mcp_stm_montevideo.bot;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -30,9 +29,6 @@ public class TelegramClient {
 
     /** Cuánto mantiene Telegram abierta la conexión del long polling esperando novedades. */
     static final int POLL_SEGUNDOS = 30;
-
-    /** Telegram corta los mensajes en 4096; cortamos nosotros antes, en un límite prolijo. */
-    private static final int MAXIMO_LARGO_MENSAJE = 4000;
 
     private final RestClient restClient;
     private final String token;
@@ -68,16 +64,14 @@ public class TelegramClient {
         return (respuesta == null || respuesta.result() == null) ? List.of() : respuesta.result();
     }
 
-    /** Manda un mensaje de texto plano, partido en pedazos si supera el límite de Telegram. */
+    /** Manda un mensaje de texto plano. El corte de textos largos lo hace el {@link Mensajero}. */
     public void enviarMensaje(long chatId, String texto) {
-        for (final String parte : partir(texto)) {
-            restClient.post()
-                    .uri("/bot{token}/sendMessage", token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("chat_id", chatId, "text", parte))
-                    .retrieve()
-                    .toBodilessEntity();
-        }
+        restClient.post()
+                .uri("/bot{token}/sendMessage", token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("chat_id", chatId, "text", texto))
+                .retrieve()
+                .toBodilessEntity();
     }
 
     /**
@@ -97,34 +91,6 @@ public class TelegramClient {
         catch (RestClientException ex) {
             log.debug("No se pudo mostrar 'escribiendo' en el chat {}: {}", chatId, ex.getMessage());
         }
-    }
-
-    /** Parte un texto en pedazos que entren en un mensaje de Telegram, cortando por renglón si puede. */
-    static List<String> partir(String texto) {
-        if (texto.length() <= MAXIMO_LARGO_MENSAJE) {
-            return List.of(texto);
-        }
-        final List<String> partes = new ArrayList<>();
-        String resto = texto;
-        while (resto.length() > MAXIMO_LARGO_MENSAJE) {
-            // Cortar en un salto de línea deja mensajes legibles; a mitad de palabra, solo si no hay.
-            final int corte = ultimoCorte(resto);
-            partes.add(resto.substring(0, corte).stripTrailing());
-            resto = resto.substring(corte).stripLeading();
-        }
-        if (!resto.isBlank()) {
-            partes.add(resto.stripTrailing());
-        }
-        return List.copyOf(partes);
-    }
-
-    private static int ultimoCorte(String texto) {
-        final int salto = texto.lastIndexOf('\n', MAXIMO_LARGO_MENSAJE);
-        if (salto > 0) {
-            return salto;
-        }
-        final int espacio = texto.lastIndexOf(' ', MAXIMO_LARGO_MENSAJE);
-        return espacio > 0 ? espacio : MAXIMO_LARGO_MENSAJE;
     }
 
     /** Sobre estándar de la API de Telegram: {@code ok} más el resultado pedido. */

@@ -219,6 +219,40 @@ público.
 
 El historial de cada chat vive en memoria y se pierde al reiniciar.
 
+## 8. El mismo bot por WhatsApp (opcional)
+
+El cerebro del bot es agnóstico del canal: WhatsApp atiende con el mismo modo comandos (siempre
+sin LLM, que es el apto para dejar público). La diferencia técnica con Telegram es que la Cloud
+API de Meta no ofrece long polling: **empuja los mensajes a un webhook**, así que hace falta una
+URL HTTPS pública. Responder mensajes que inicia el usuario no tiene costo; Meta cobra solo las
+plantillas que inicia el negocio.
+
+1. Creá una app en <https://developers.facebook.com> y agregale el producto **WhatsApp**. Te dan
+   un número de prueba gratis (podés chatear con hasta 5 números que registres).
+2. De la pantalla *API Setup* copiá el **access token** y el **phone number ID**.
+3. Completá `config/application.yaml`:
+
+```yaml
+bot:
+  whatsapp:
+    access-token: el-token-de-la-app
+    phone-number-id: "123456789012345"
+    verify-token: un-secreto-que-inventás-vos
+    app-secret: el-app-secret        # opcional: verifica la firma de cada webhook
+```
+
+4. Exponé la app en HTTPS. En desarrollo alcanza un túnel:
+   `cloudflared tunnel --url http://localhost:8080` (o ngrok).
+5. En la app de Meta → WhatsApp → *Configuration*, registrá el webhook:
+   la URL es `https://tu-host/webhook/whatsapp`, el verify token es el que inventaste, y
+   suscribite al campo **messages**.
+6. Escribile al número de prueba desde un WhatsApp registrado: los mismos comandos de la tabla
+   de arriba, ubicación compartida incluida. Las alertas (`avisame 3977 185`) también avisan
+   por WhatsApp, al mismo número que las pidió.
+
+Para pasar del número de prueba a uno real hace falta verificar el negocio en Meta; el código no
+cambia.
+
 ## Tests
 
 ```bash

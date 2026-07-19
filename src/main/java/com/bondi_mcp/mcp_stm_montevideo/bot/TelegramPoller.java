@@ -31,6 +31,7 @@ public class TelegramPoller implements ApplicationRunner {
     private final TelegramClient telegramClient;
     private final ConversacionBot conversacionBot;
     private final RespondedorDirecto respondedorDirecto;
+    private final Mensajero mensajero;
 
     /** Un candado por chat: dos mensajes seguidos del mismo usuario no deben pisarse el historial. */
     private final Map<Long, Object> candados = new ConcurrentHashMap<>();
@@ -88,7 +89,7 @@ public class TelegramPoller implements ApplicationRunner {
             synchronized (candados.computeIfAbsent(chatId, id -> new Object())) {
                 try {
                     telegramClient.mostrarEscribiendo(chatId);
-                    telegramClient.enviarMensaje(chatId, responderA(chatId, mensaje));
+                    mensajero.enviar(Charla.telegram(chatId), responderA(chatId, mensaje));
                 }
                 catch (RuntimeException ex) {
                     log.warn("No se pudo responder al chat {}: {}", chatId, ex.getMessage());
@@ -101,11 +102,12 @@ public class TelegramPoller implements ApplicationRunner {
         if (conversacionBot.habilitado()) {
             return conversacionBot.responder(chatId, textoParaElAgente(mensaje));
         }
+        final Charla charla = Charla.telegram(chatId);
         if (mensaje.location() != null) {
-            return respondedorDirecto.responderUbicacion(
+            return respondedorDirecto.responderUbicacion(charla,
                     mensaje.location().latitude(), mensaje.location().longitude());
         }
-        return respondedorDirecto.responder(chatId, mensaje.text());
+        return respondedorDirecto.responder(charla, mensaje.text());
     }
 
     private static boolean tieneContenido(TelegramClient.Mensaje mensaje) {

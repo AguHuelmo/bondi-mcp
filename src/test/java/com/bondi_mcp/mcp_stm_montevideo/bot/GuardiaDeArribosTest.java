@@ -20,7 +20,7 @@ import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class GuardiaDeArribosTest {
 
-    private static final long CHAT = 7L;
+    private static final Charla CHAT = Charla.telegram(7);
     private static final Parada UNA_PARADA =
             new Parada(3977L, "GABRIEL A PEREIRA", "PEDRO F BERRO", new Coordenada(-34.91, -56.15));
 
@@ -43,7 +43,7 @@ class GuardiaDeArribosTest {
     private ArriboService arriboService;
 
     @Mock
-    private TelegramClient telegramClient;
+    private Mensajero mensajero;
 
     @InjectMocks
     private GuardiaDeArribos guardia;
@@ -102,7 +102,7 @@ class GuardiaDeArribosTest {
         guardia.revisar(Instant.now());
         guardia.revisar(Instant.now());
 
-        verify(telegramClient, times(1)).enviarMensaje(eq(CHAT), contains("¡Ahí viene!"));
+        verify(mensajero, times(1)).enviar(eq(CHAT), contains("¡Ahí viene!"));
         assertThat(guardia.listar(CHAT)).contains("No tenés alertas");
     }
 
@@ -113,7 +113,7 @@ class GuardiaDeArribosTest {
 
         guardia.revisar(Instant.now());
 
-        verify(telegramClient, never()).enviarMensaje(anyLong(), contains("Ahí viene"));
+        verify(mensajero, never()).enviar(any(Charla.class), contains("Ahí viene"));
         assertThat(guardia.listar(CHAT)).contains("185");
     }
 
@@ -127,7 +127,7 @@ class GuardiaDeArribosTest {
         guardia.revisar(Instant.now()); // falla la consulta: la alerta sigue viva
         guardia.revisar(Instant.now()); // ahora sí
 
-        verify(telegramClient, times(1)).enviarMensaje(eq(CHAT), contains("¡Ahí viene!"));
+        verify(mensajero, times(1)).enviar(eq(CHAT), contains("¡Ahí viene!"));
     }
 
     @Test
@@ -136,7 +136,7 @@ class GuardiaDeArribosTest {
 
         guardia.revisar(Instant.now().plus(Duration.ofMinutes(46)));
 
-        verify(telegramClient).enviarMensaje(eq(CHAT), contains("Corté la guardia"));
+        verify(mensajero).enviar(eq(CHAT), contains("Corté la guardia"));
         assertThat(guardia.listar(CHAT)).contains("No tenés alertas");
     }
 

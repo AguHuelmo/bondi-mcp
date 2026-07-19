@@ -77,9 +77,9 @@ public class RespondedorDirecto {
     private final GuardiaDeArribos guardiaDeArribos;
 
     /** Responde un mensaje de texto. Nunca tira: del otro lado hay una persona. */
-    public String responder(long chatId, String texto) {
+    public String responder(Charla charla, String texto) {
         try {
-            return despachar(chatId, texto == null ? "" : texto.trim());
+            return despachar(charla, texto == null ? "" : texto.trim());
         }
         catch (TransportePublicoException ex) {
             log.warn("La API de la Intendencia falló atendiendo '{}': {}", texto, ex.getMessage());
@@ -92,7 +92,7 @@ public class RespondedorDirecto {
     }
 
     /** Responde una ubicación compartida: las paradas más cercanas y cómo seguir. */
-    public String responderUbicacion(double latitud, double longitud) {
+    public String responderUbicacion(Charla charla, double latitud, double longitud) {
         try {
             final List<ParadaCercana> cercanas =
                     paradaService.cercanasA(new Coordenada(latitud, longitud), 5);
@@ -110,20 +110,20 @@ public class RespondedorDirecto {
         }
     }
 
-    private String despachar(long chatId, String texto) {
+    private String despachar(Charla charla, String texto) {
         if (texto.isEmpty() || texto.startsWith("/start") || texto.startsWith("/ayuda")
                 || texto.equalsIgnoreCase("ayuda") || texto.equalsIgnoreCase("hola")) {
             return AYUDA;
         }
         if (texto.equalsIgnoreCase("alertas")) {
-            return guardiaDeArribos.listar(chatId);
+            return guardiaDeArribos.listar(charla);
         }
         if (texto.equalsIgnoreCase("cancelar")) {
-            return guardiaDeArribos.cancelar(chatId);
+            return guardiaDeArribos.cancelar(charla);
         }
         final Matcher aviso = AVISAME.matcher(texto);
         if (aviso.matches()) {
-            return guardiaDeArribos.crear(chatId,
+            return guardiaDeArribos.crear(charla,
                     Long.parseLong(aviso.group(1)),
                     aviso.group(2),
                     aviso.group(3) == null ? null : Integer.valueOf(aviso.group(3)));

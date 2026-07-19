@@ -44,3 +44,17 @@ montevideo:
 #
 #   claude:
 #     api-key: sk-ant-tu-api-key
+
+# --- WhatsApp (opcional) ---
+#
+# El mismo bot en modo comandos, atendiendo un numero de WhatsApp via la Cloud API de Meta.
+# Responder mensajes que inicia el usuario no tiene costo; Meta solo cobra plantillas.
+# Necesita una URL HTTPS publica apuntando a /webhook/whatsapp (en desarrollo: cloudflared
+# o ngrok). Pasos completos en el README.
+#
+# bot:
+#   whatsapp:
+#     access-token: el-token-de-tu-app-de-meta
+#     phone-number-id: "123456789012345"
+#     verify-token: un-secreto-que-inventas-vos
+#     app-secret: el-app-secret-de-la-app   # opcional: verifica la firma de cada webhook

@@ -29,6 +29,7 @@ class ConversacionBotTest {
     private ConversacionBot bot() {
         return new ConversacionBot(new BotProperties(
                 new BotProperties.Telegram("", "https://api.telegram.org"),
+                new BotProperties.Whatsapp("", "", "", "", "https://graph.facebook.com/v21.0"),
                 new BotProperties.Claude("", "claude-opus-4-8", 30)), transporte);
     }
 

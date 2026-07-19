@@ -53,7 +53,7 @@ public class GuardiaDeArribos {
 
     private final ParadaService paradaService;
     private final ArriboService arriboService;
-    private final TelegramClient telegramClient;
+    private final Mensajero mensajero;
 
     private final List<Alerta> alertas = new CopyOnWriteArrayList<>();
     private final AtomicBoolean vigilando = new AtomicBoolean(false);
@@ -66,7 +66,7 @@ public class GuardiaDeArribos {
      * momento de decirle al usuario que se equivocó, no media hora después en silencio. Y si el
      * bondi YA está a tiro, avisa directo y no crea nada.
      */
-    public String crear(long chatId, long codigoParada, String linea, Integer minutosPedidos) {
+    public String crear(Charla charla, long codigoParada, String linea, Integer minutosPedidos) {
         final int minutos = minutosPedidos == null
                 ? UMBRAL_POR_DEFECTO
                 : Math.clamp(minutosPedidos, 1, UMBRAL_MAXIMO);
@@ -91,14 +91,14 @@ public class GuardiaDeArribos {
         }
 
         // Pedir de nuevo la misma alerta actualiza el umbral en vez de duplicarla.
-        alertas.removeIf(alerta -> alerta.chatId() == chatId
+        alertas.removeIf(alerta -> alerta.charla().equals(charla)
                 && alerta.codigoParada() == codigoParada && alerta.linea().equals(nombreLinea));
-        if (alertas.stream().filter(alerta -> alerta.chatId() == chatId).count() >= MAXIMAS_POR_CHAT) {
+        if (alertas.stream().filter(alerta -> alerta.charla().equals(charla)).count() >= MAXIMAS_POR_CHAT) {
             return "Ya tenés " + MAXIMAS_POR_CHAT + " alertas activas. Mandá \"cancelar\" para "
                     + "cortarlas, o esperá a que se cumplan.";
         }
 
-        alertas.add(new Alerta(chatId, codigoParada, parada.get().descripcion(), nombreLinea,
+        alertas.add(new Alerta(charla, codigoParada, parada.get().descripcion(), nombreLinea,
                 minutos, Instant.now()));
         asegurarVigilancia();
         return "🔔 Listo. Te aviso cuando la " + nombreLinea + " esté a " + minutos
@@ -107,9 +107,9 @@ public class GuardiaDeArribos {
     }
 
     /** Las alertas activas de un chat, listas para mostrar. */
-    public String listar(long chatId) {
+    public String listar(Charla charla) {
         final List<Alerta> mias = alertas.stream()
-                .filter(alerta -> alerta.chatId() == chatId)
+                .filter(alerta -> alerta.charla().equals(charla))
                 .toList();
         if (mias.isEmpty()) {
             return "No tenés alertas activas. Creá una con: avisame 3977 185";
@@ -124,8 +124,8 @@ public class GuardiaDeArribos {
     }
 
     /** Corta todas las alertas de un chat. */
-    public String cancelar(long chatId) {
-        final boolean habia = alertas.removeIf(alerta -> alerta.chatId() == chatId);
+    public String cancelar(Charla charla) {
+        final boolean habia = alertas.removeIf(alerta -> alerta.charla().equals(charla));
         return habia ? "Listo, corté todas tus alertas." : "No tenías ninguna alerta activa.";
     }
 
@@ -209,10 +209,10 @@ public class GuardiaDeArribos {
             return;
         }
         try {
-            telegramClient.enviarMensaje(alerta.chatId(), mensaje);
+            mensajero.enviar(alerta.charla(), mensaje);
         }
         catch (RuntimeException ex) {
-            log.warn("No se pudo avisar al chat {}: {}", alerta.chatId(), ex.getMessage());
+            log.warn("No se pudo avisar a la charla {}: {}", alerta.charla(), ex.getMessage());
         }
     }
 
@@ -248,8 +248,8 @@ public class GuardiaDeArribos {
         activo = false;
     }
 
-    /** Una alerta activa: a quién avisarle, de qué línea en qué parada, y desde cuándo espera. */
-    record Alerta(long chatId, long codigoParada, String descripcionParada, String linea,
+    /** Una alerta activa: a qué charla avisarle, de qué línea en qué parada, y desde cuándo. */
+    record Alerta(Charla charla, long codigoParada, String descripcionParada, String linea,
             int minutos, Instant creadaEn) {
     }
 }
