@@ -4,7 +4,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -39,6 +41,10 @@ import lombok.extern.slf4j.Slf4j;
  * lenguaje natural: números de parada, "parada línea", cruces para buscar, "origen > destino",
  * "linea 185" y ubicaciones compartidas. Todo lo demás se trata como una búsqueda de paradas,
  * que ya es tolerante a errores por diseño.
+ *
+ * <p>Como el código del cartel muchas veces no se ve (o no hay cartel), cada lista de paradas
+ * que devuelve queda numerada y recordada por charla: alcanza con contestar "1" o "2" para
+ * elegir, y "avisame 2 185" también acepta el número de opción.
  */
 @Slf4j
 @Component
@@ -51,7 +57,7 @@ public class RespondedorDirecto {
 
     /** "avisame 3977 185" o "avisame 3977 185 10": parada, línea y minutos opcionales. */
     private static final Pattern AVISAME =
-            Pattern.compile("(?iu)^(?:av[ií]same?|alerta)\\s+(\\d{3,7})\\s+(\\S{1,6})(?:\\s+(\\d{1,2}))?$");
+            Pattern.compile("(?iu)^(?:av[ií]same?|alerta)\\s+(\\d{1,7})\\s+(\\S{1,6})(?:\\s+(\\d{1,2}))?$");
 
     private static final String AYUDA = """
             ¡Hola! Soy el bot de los bondis de Montevideo 🚌
@@ -64,9 +70,15 @@ public class RespondedorDirecto {
             · linea 185 para ver el recorrido y cuántos coches andan
             · avisame 3977 185 y te escribo cuando esté a 5 min o menos
               (avisame 3977 185 10 si querés 10 min; "alertas" las lista, "cancelar" las corta)
-            · o compartime tu ubicación con el clip 📎 y te muestro las paradas cercanas""";
+            · o compartime tu ubicación con el clip 📎 y te muestro las paradas cercanas
+
+            Cuando te mande una lista de paradas, contestá el número de opción (1, 2...) y
+            listo: no hace falta el código del cartel.""";
 
     private static final String PIE_ARRIBOS = "Los tiempos son estimados y cambian minuto a minuto.";
+
+    private static final String PIE_OPCIONES = "Contestá con el número de opción (1, 2...) y te "
+            + "digo qué viene; el código de parada también sirve. Para una alerta: avisame 1 185";
 
     private final ParadaService paradaService;
     private final ArriboService arriboService;
@@ -75,6 +87,9 @@ public class RespondedorDirecto {
     private final BusEnVivoService busEnVivoService;
     private final HorarioTeoricoService horarioTeoricoService;
     private final GuardiaDeArribos guardiaDeArribos;
+
+    /** La última lista de paradas que vio cada charla, para poder elegir por número de opción. */
+    private final Map<Charla, List<Parada>> ultimasOpciones = new ConcurrentHashMap<>();
 
     /** Responde un mensaje de texto. Nunca tira: del otro lado hay una persona. */
     public String responder(Charla charla, String texto) {
@@ -99,9 +114,8 @@ public class RespondedorDirecto {
             if (cercanas.isEmpty()) {
                 return "No encontré paradas cerca de esa ubicación. ¿Estás en Montevideo?";
             }
-            return "Las paradas más cerca tuyo:\n\n"
-                    + cercanas.stream().map(RespondedorDirecto::renglonCercana).collect(Collectors.joining("\n"))
-                    + "\n\nMandame el número de una parada y te digo qué viene.";
+            return "Las paradas más cerca tuyo:\n\n" + listadoDeCercanas(charla, cercanas)
+                    + "\n\n" + PIE_OPCIONES;
         }
         catch (TransportePublicoException ex) {
             log.warn("La API de la Intendencia falló con la ubicación ({}, {}): {}", latitud, longitud,
@@ -123,27 +137,44 @@ public class RespondedorDirecto {
         }
         final Matcher aviso = AVISAME.matcher(texto);
         if (aviso.matches()) {
+            final Optional<Long> parada = codigoDeParada(charla, aviso.group(1));
+            if (parada.isEmpty()) {
+                return "Para \"avisame " + aviso.group(1) + " ...\" me falta la lista de la que "
+                        + "elegir: mandame primero la esquina o dirección. El código de parada "
+                        + "también sirve: avisame 3977 " + aviso.group(2);
+            }
             return guardiaDeArribos.crear(charla,
-                    Long.parseLong(aviso.group(1)),
+                    parada.get(),
                     aviso.group(2),
                     aviso.group(3) == null ? null : Integer.valueOf(aviso.group(3)));
         }
         if (texto.contains(">")) {
             return viaje(texto);
         }
+        if (texto.matches("\\d{1,2}")) {
+            final Optional<Parada> elegida = opcionElegida(charla, Integer.parseInt(texto));
+            if (elegida.isPresent()) {
+                return arribos(elegida.get());
+            }
+            // No era una opción de la última lista: sigue el camino de parada o línea.
+        }
         if (texto.matches("\\d{1,7}")) {
             return paradaOLinea(texto);
         }
-        // "3977 185": parada y línea, para las próximas salidas teóricas.
-        if (texto.matches("\\d{3,7}\\s+\\S{1,6}")) {
+        // "3977 185" (o "2 185", eligiendo de la última lista): próximas salidas teóricas.
+        if (texto.matches("\\d{1,7}\\s+\\S{1,6}")) {
             final String[] partes = texto.split("\\s+");
-            return proximasSalidas(Long.parseLong(partes[0]), partes[1]);
+            final Optional<Long> parada = codigoDeParada(charla, partes[0]);
+            if (parada.isPresent()) {
+                return proximasSalidas(parada.get(), partes[1]);
+            }
+            // Un número corto sin lista previa no es una parada: se sigue como búsqueda.
         }
         final String[] palabras = texto.split("\\s+", 2);
         if (palabras.length == 2 && esComandoDeLinea(palabras[0])) {
             return linea(palabras[1]);
         }
-        return busqueda(texto);
+        return busqueda(charla, texto);
     }
 
     private static boolean esComandoDeLinea(String palabra) {
@@ -319,18 +350,15 @@ public class RespondedorDirecto {
         return total < 1000 ? total + " m" : String.format(Locale.ROOT, "%.1f km", total / 1000.0);
     }
 
-    private String busqueda(String texto) {
+    private String busqueda(Charla charla, String texto) {
         final ResultadoBusqueda resultado = paradaService.buscar(texto);
 
         if (resultado.hayCercanasAlPunto()) {
             final String titulo = resultado.punto().descripcion() != null
                     ? "📍 " + resultado.punto().descripcion() + ". Las paradas más cercanas:"
                     : "En ese cruce no hay parada, pero estimé dónde queda. Las más cercanas:";
-            return titulo + "\n\n"
-                    + resultado.cercanasAlPunto().stream()
-                            .map(RespondedorDirecto::renglonCercana)
-                            .collect(Collectors.joining("\n"))
-                    + "\n\nMandame el número de una parada y te digo qué viene.";
+            return titulo + "\n\n" + listadoDeCercanas(charla, resultado.cercanasAlPunto())
+                    + "\n\n" + PIE_OPCIONES;
         }
 
         if (resultado.sinResultados()) {
@@ -346,16 +374,58 @@ public class RespondedorDirecto {
         final String titulo = resultado.soloAproximadas()
                 ? "Ninguna coincide del todo. ¿Será alguna de estas?"
                 : "Encontré estas paradas:";
-        return titulo + "\n\n"
-                + resultado.paradas().stream()
-                        .limit(MAXIMAS_PARADAS_LISTADAS)
-                        .map(parada -> "· " + parada.descripcion() + " (parada " + parada.codigo() + ")")
-                        .collect(Collectors.joining("\n"))
-                + "\n\nMandame el número de una parada y te digo qué viene.";
+        final List<Parada> opciones = resultado.paradas().stream()
+                .limit(MAXIMAS_PARADAS_LISTADAS)
+                .toList();
+        recordarOpciones(charla, opciones);
+        final StringBuilder listado = new StringBuilder();
+        for (int i = 0; i < opciones.size(); i++) {
+            if (i > 0) {
+                listado.append('\n');
+            }
+            listado.append(i + 1).append(") ").append(opciones.get(i).descripcion())
+                    .append(" (parada ").append(opciones.get(i).codigo()).append(')');
+        }
+        return titulo + "\n\n" + listado + "\n\n" + PIE_OPCIONES;
     }
 
-    private static String renglonCercana(ParadaCercana cercana) {
-        return "· a " + cercana.distanciaLegible() + " · " + cercana.parada().descripcion()
-                + " (parada " + cercana.parada().codigo() + ")";
+    /** Lista numerada de cercanas con distancia; queda recordada para elegir por número. */
+    private String listadoDeCercanas(Charla charla, List<ParadaCercana> cercanas) {
+        recordarOpciones(charla, cercanas.stream().map(ParadaCercana::parada).toList());
+        final StringBuilder listado = new StringBuilder();
+        for (int i = 0; i < cercanas.size(); i++) {
+            final ParadaCercana cercana = cercanas.get(i);
+            if (i > 0) {
+                listado.append('\n');
+            }
+            listado.append(i + 1).append(") a ").append(cercana.distanciaLegible()).append(" · ")
+                    .append(cercana.parada().descripcion())
+                    .append(" (parada ").append(cercana.parada().codigo()).append(')');
+        }
+        return listado.toString();
+    }
+
+    private void recordarOpciones(Charla charla, List<Parada> paradas) {
+        ultimasOpciones.put(charla, List.copyOf(paradas));
+    }
+
+    /** La parada elegida de la última lista, si el número corresponde a una opción. */
+    private Optional<Parada> opcionElegida(Charla charla, int numero) {
+        final List<Parada> opciones = ultimasOpciones.get(charla);
+        if (opciones == null || numero < 1 || numero > opciones.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(opciones.get(numero - 1));
+    }
+
+    /**
+     * Resuelve lo que el usuario llamó "parada": un código del cartel (3 dígitos o más) o el
+     * número de una opción de la última lista (1 o 2 dígitos).
+     */
+    private Optional<Long> codigoDeParada(Charla charla, String numero) {
+        if (numero.length() >= 3) {
+            return Optional.of(Long.parseLong(numero));
+        }
+        return opcionElegida(charla, Integer.parseInt(numero)).map(Parada::codigo);
     }
 }

@@ -198,12 +198,18 @@ mensaje cuesta cero y se puede dejar público sin miedo. Entiende:
 | `3977` (el código del cartel) | los próximos arribos de esa parada |
 | `3977 185` | las próximas salidas programadas de la 185 por ahí |
 | `18 de julio y ejido` | las paradas de ese cruce (o las más cercanas si no hay) |
+| `gabriel pereira 2470` | las paradas más cercanas a esa puerta, con la distancia |
+| `1`, `2`, `3`… | elegir de la última lista que te mandó, sin código de cartel |
 | `estadio centenario > pocitos` | qué línea tomar, dónde subir y dónde bajar |
 | `linea 185` | el recorrido y cuántos coches andan ahora |
 | `avisame 3977 185` | un aviso cuando la 185 esté a 5 min o menos de esa parada |
 | `avisame 3977 185 10` | lo mismo pero con 10 minutos de anticipación |
 | `alertas` / `cancelar` | ver o cortar tus alertas activas |
 | tu ubicación con el clip 📎 | las paradas más cercanas con la distancia |
+
+El código del cartel muchas veces no se ve (o no hay cartel): por eso toda lista de paradas que
+manda el bot viene numerada, y alcanza con contestar `1` o `2` para ver los arribos. También
+funciona en las alertas: `avisame 2 185` vigila la opción 2 de la última lista.
 
 Las alertas son la gracia del bot: en vez de mirar la app parado en la esquina, le pedís que te
 avise y seguís con lo tuyo. La guardia revisa los arribos cada 30 segundos (una sola consulta

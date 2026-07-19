@@ -16,6 +16,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.ArribosDeParada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
+import com.bondi_mcp.mcp_stm_montevideo.domain.ResultadoBusqueda;
 import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
@@ -148,6 +149,47 @@ class RespondedorDirectoTest {
 
         assertThat(respondedor.responder(CHARLA, "alertas")).isEqualTo("tus alertas");
         assertThat(respondedor.responder(CHARLA, "cancelar")).isEqualTo("cortadas");
+    }
+
+    @Test
+    void despues_de_una_busqueda_se_puede_elegir_por_numero_de_opcion() {
+        final Parada otra = new Parada(3979L, "GABRIEL A PEREIRA", "ELLAURI", new Coordenada(-34.912, -56.152));
+        given(paradaService.buscar("gabriel pereira")).willReturn(new ResultadoBusqueda(
+                List.of(UNA_PARADA, otra), List.of("GABRIEL", "PEREIRA"), 2));
+        given(arriboService.proximosArribos(3979L)).willReturn(
+                new ArribosDeParada(3979L, List.of(), List.of("185")));
+
+        final String listado = respondedor.responder(CHARLA, "gabriel pereira");
+        final String eleccion = respondedor.responder(CHARLA, "2");
+
+        assertThat(listado).contains("1) ").contains("2) ").contains("número de opción");
+        assertThat(eleccion).contains("GABRIEL A PEREIRA y ELLAURI");
+    }
+
+    @Test
+    void avisame_acepta_el_numero_de_opcion_de_la_ultima_lista() {
+        final Parada otra = new Parada(3979L, "GABRIEL A PEREIRA", "ELLAURI", new Coordenada(-34.912, -56.152));
+        given(paradaService.buscar("gabriel pereira")).willReturn(new ResultadoBusqueda(
+                List.of(UNA_PARADA, otra), List.of("GABRIEL", "PEREIRA"), 2));
+        given(guardiaDeArribos.crear(CHARLA, 3979L, "185", null)).willReturn("creada");
+
+        respondedor.responder(CHARLA, "gabriel pereira");
+
+        assertThat(respondedor.responder(CHARLA, "avisame 2 185")).isEqualTo("creada");
+    }
+
+    @Test
+    void avisame_con_opcion_sin_lista_previa_explica_como_seguir() {
+        assertThat(respondedor.responder(Charla.telegram(99), "avisame 2 185"))
+                .contains("me falta la lista");
+    }
+
+    @Test
+    void un_numero_chico_sin_lista_previa_sigue_siendo_parada_o_linea() {
+        given(paradaService.porCodigo(2L)).willReturn(Optional.empty());
+        given(recorridoService.recorridoDe("2")).willReturn(new RecorridoDeLinea("2", List.of()));
+
+        assertThat(respondedor.responder(Charla.telegram(98), "2")).contains("No encontré la parada 2");
     }
 
     @Test
