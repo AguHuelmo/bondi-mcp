@@ -22,6 +22,7 @@ import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
+import com.bondi_mcp.mcp_stm_montevideo.service.PuntualidadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -65,6 +66,9 @@ class TransporteMcpToolsTest {
 
     @Mock
     private EstimadorDeLlegada estimadorDeLlegada;
+
+    @Mock
+    private PuntualidadService puntualidadService;
 
     @InjectMocks
     private TransporteMcpTools tools;
@@ -220,6 +224,17 @@ class TransporteMcpToolsTest {
         assertThat(respuesta.indice().nivel()).isEqualTo("muy buena");
         assertThat(respuesta.indice().porcentajeDeLaCiudadAlcanzable()).isEqualTo(41);
         assertThat(respuesta.contexto()).contains("cuatro componentes");
+    }
+
+    @Test
+    void puntualidad_sin_observaciones_avisa_que_el_dato_se_construye_con_el_uso() {
+        given(puntualidadService.historialDe("185", null))
+                .willReturn(com.bondi_mcp.mcp_stm_montevideo.domain.HistorialDeEsperas.vacio("185", null));
+
+        final var respuesta = tools.puntualidadDeLinea("185", null);
+
+        assertThat(respuesta.historial().observaciones()).isZero();
+        assertThat(respuesta.contexto()).contains("NO inventes esperas");
     }
 
     @Test

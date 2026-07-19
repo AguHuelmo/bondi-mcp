@@ -20,6 +20,7 @@ import com.bondi_mcp.mcp_stm_montevideo.domain.Arribo;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ArribosDeParada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
+import com.bondi_mcp.mcp_stm_montevideo.domain.HistorialDeEsperas;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ParadaCercana;
 import com.bondi_mcp.mcp_stm_montevideo.domain.PronosticoDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.RecorridoDeLinea;
@@ -31,6 +32,7 @@ import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
+import com.bondi_mcp.mcp_stm_montevideo.service.PuntualidadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -61,6 +63,10 @@ public class RespondedorDirecto {
     private static final int MAXIMAS_OPCIONES_DE_VIAJE = 3;
     private static final int PROXIMAS_SALIDAS = 3;
 
+    /** "puntualidad 185" o "puntualidad 185 3977": las esperas reales observadas. */
+    private static final Pattern PUNTUALIDAD = Pattern.compile(
+            "(?iu)^(?:puntualidad|esperas)\\s+(\\S{1,6})(?:\\s+(\\d{3,7}))?$");
+
     /** "llego origen > destino 18:30": el veredicto de si se llega a tiempo. */
     private static final Pattern LLEGO = Pattern.compile(
             "(?iu)^llego\\s+(.+?)\\s*>\\s*(.+?)\\s+(?:a\\s+las?\\s+)?(\\d{1,2}):(\\d{2})\\s*$");
@@ -82,6 +88,7 @@ public class RespondedorDirecto {
               (avisame 3977 185 10 si querés 10 min; "alertas" las lista, "cancelar" las corta)
             · llego origen > destino 18:30 y te digo si llegás a esa hora
             · conectividad gabriel pereira 2470 para saber qué tan bien servida está esa zona
+            · puntualidad 185 (o puntualidad 185 3977) para las esperas reales observadas
             · o compartime tu ubicación con el clip 📎 y te muestro las paradas cercanas
 
             Cuando te mande una lista de paradas, contestá el número de opción (1, 2...) y
@@ -100,6 +107,7 @@ public class RespondedorDirecto {
     private final HorarioTeoricoService horarioTeoricoService;
     private final ConectividadService conectividadService;
     private final EstimadorDeLlegada estimadorDeLlegada;
+    private final PuntualidadService puntualidadService;
     private final GuardiaDeArribos guardiaDeArribos;
 
     /** La última lista de paradas que vio cada charla, para poder elegir por número de opción. */
@@ -195,6 +203,11 @@ public class RespondedorDirecto {
         }
         if (palabras.length == 2 && palabras[0].equalsIgnoreCase("conectividad")) {
             return conectividad(palabras[1]);
+        }
+        final Matcher puntualidad = PUNTUALIDAD.matcher(texto);
+        if (puntualidad.matches()) {
+            return puntualidad(puntualidad.group(1),
+                    puntualidad.group(2) == null ? null : Long.valueOf(puntualidad.group(2)));
         }
         return busqueda(charla, texto);
     }
@@ -427,6 +440,42 @@ public class RespondedorDirecto {
                 + "Llegada estimada: " + pronostico.llegadaEstimada()
                         .format(DateTimeFormatter.ofPattern("HH:mm"))
                 + ". Es una guía: el tránsito manda 🚌";
+    }
+
+    /** Las esperas reales observadas de una línea, con la comparación contra el papel. */
+    private String puntualidad(String linea, Long codigoParada) {
+        final HistorialDeEsperas historial = puntualidadService.historialDe(linea, codigoParada);
+        if (historial.sinDatos()) {
+            return "Todavía no junté observaciones de la " + historial.linea()
+                    + (codigoParada != null ? " en la parada " + codigoParada : "")
+                    + ". El historial se arma solo con el uso: consultá arribos o dejá alertas "
+                    + "y en unos días hay dato 📈";
+        }
+
+        final StringBuilder sb = new StringBuilder("📊 Esperas reales de la ")
+                .append(historial.linea());
+        if (codigoParada != null) {
+            sb.append(" en la parada ").append(codigoParada);
+        }
+        sb.append("\n\n· ").append(historial.observaciones()).append(" observaciones desde el ")
+                .append(historial.primeraObservacion()
+                        .format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                .append('\n')
+                .append("· espera típica: ").append(historial.esperaMedianaMinutos())
+                .append(" min (promedio ").append(historial.esperaMediaMinutos()).append(")\n")
+                .append("· con mala suerte (peor 10%): ").append(historial.esperaP90Minutos())
+                .append(" min o más");
+        if (historial.esperaTeoricaMinutos() != null) {
+            sb.append("\n· el horario programado promete ~")
+                    .append(historial.esperaTeoricaMinutos()).append(" min de espera");
+        }
+        if (!historial.porFranja().isEmpty()) {
+            sb.append("\n· por franja: ").append(historial.porFranja().stream()
+                    .map(franja -> franja.nombre() + " " + franja.esperaMediaMinutos() + " min")
+                    .collect(Collectors.joining(" · ")));
+        }
+        return sb.append("\n\nEl dato se junta solo con el uso: cuanto más se consulta, mejor.")
+                .toString();
     }
 
     /** El índice de conectividad, contado como para un chat. */

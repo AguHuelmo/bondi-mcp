@@ -26,6 +26,7 @@ la misma que usa la app *Cómo Ir*.
 | Dónde está cada coche de una línea, en vivo | `buses_en_vivo` | `GET /api/lineas/{linea}/buses` |
 | Qué tan bien servida por ómnibus está una dirección | `conectividad` | `GET /api/conectividad?query=...` |
 | ¿Llego a tiempo? Veredicto con desglose minuto a minuto | `llego_a_tiempo` | `GET /api/viajes/llego?origen=&destino=&hora=` |
+| Esperas reales observadas de una línea (historial) | `puntualidad_de_linea` | `GET /api/puntualidad?linea=...` |
 
 El **índice de conectividad** es el dato que ninguna app de transporte da: no "cuándo viene el
 bondi" sino "¿me conviene mudarme acá?". Puntúa de 0 a 100 con cuatro componentes —cercanía de
@@ -296,6 +297,7 @@ Conectá el server (sección 6) y probá cada tool con una pregunta en lenguaje 
 | `buses_en_vivo` | La posición GPS actual de cada coche de una línea | *"¿Dónde anda la 185 ahora?"* |
 | `conectividad` | Índice 0–100 de qué tan bien servida está una dirección | *"¿Está bien conectado un apartamento en 26 de marzo y Buxareo?"* |
 | `llego_a_tiempo` | Veredicto de si llegás a una hora, cruzando planificador y tiempo real | *"Estoy en Gabriel Pereira y Berro, ¿llego a 18 y Ejido a las 18:30?"* |
+| `puntualidad_de_linea` | Esperas reales observadas vs las prometidas; el dataset se construye solo con el uso | *"¿La 185 pasa seguido de verdad?"* |
 
 ### WEB — API REST y páginas
 
@@ -315,6 +317,7 @@ Con el backend en `:8080`:
 | Coches en vivo de una línea | `curl localhost:8080/api/lineas/185/buses` |
 | Tramo real entre dos paradas | `curl "localhost:8080/api/lineas/185/tramo?subida=3977&bajada=1234"` |
 | Índice de conectividad | `curl "localhost:8080/api/conectividad?query=gabriel pereira 2470"` |
+| Historial de esperas observadas | `curl "localhost:8080/api/puntualidad?linea=185&parada=3977"` |
 | Conectividad por coordenada | `curl "localhost:8080/api/conectividad/punto?lat=-34.906&lon=-56.19"` |
 | **Demo para inmobiliarias** | abrir <http://localhost:8080/demo-conectividad.html> |
 | **Widget embebible** | abrir <http://localhost:8080/conectividad.html?query=18%20de%20julio%20y%20ejido> |
@@ -337,6 +340,7 @@ gratis por mensaje; los mismos aplican por WhatsApp (sección 8):
 | `llego 21 de setiembre 2800 > 18 de julio y ejido 18:30` | ¿Llegás a esa hora? Veredicto con desglose |
 | `linea 185` | Recorrido por sentido + cuántos coches andan ahora |
 | `conectividad 26 de marzo y buxareo` | El índice de conectividad de esa zona |
+| `puntualidad 185` (o `puntualidad 185 3977`) | Esperas reales observadas vs el horario prometido |
 | `avisame 3977 185` | Alerta: te escribe cuando la 185 esté a ≤5 min (`avisame 3977 185 10` para 10) |
 | `avisame 2 185` | La misma alerta, eligiendo la parada de la última lista |
 | `alertas` / `cancelar` | Ver o cortar tus alertas |

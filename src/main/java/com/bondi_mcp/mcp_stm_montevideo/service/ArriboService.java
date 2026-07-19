@@ -29,6 +29,7 @@ public class ArriboService {
 
     private final TransportePublicoClient client;
     private final ParadaLineaRepository paradaLineaRepository;
+    private final PuntualidadService puntualidadService;
 
     /**
      * Próximos arribos a una parada, más las líneas que pasan por ella.
@@ -56,6 +57,18 @@ public class ArriboService {
         }
 
         final List<Arribo> arribos = client.obtenerProximosArribos(codigoParada, enCirculacion, cantidadPorLinea);
+
+        // Cada consulta alimenta el historial de esperas, gratis: los datos ya vinieron. En
+        // transacción propia y con el fallo tragado, porque el historial es un subproducto y el
+        // que pregunta cuándo viene el bondi no puede pagar sus platos rotos.
+        try {
+            puntualidadService.registrar(codigoParada, arribos);
+        }
+        catch (RuntimeException ex) {
+            log.debug("No se pudo registrar la observación de la parada {}: {}", codigoParada,
+                    ex.getMessage());
+        }
+
         return new ArribosDeParada(codigoParada, arribos, lineasQuePasan);
     }
 

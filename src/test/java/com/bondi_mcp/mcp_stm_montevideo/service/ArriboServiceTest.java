@@ -34,6 +34,9 @@ class ArriboServiceTest {
     @Mock
     private ParadaLineaRepository paradaLineaRepository;
 
+    @Mock
+    private PuntualidadService puntualidadService;
+
     @InjectMocks
     private ArriboService service;
 
@@ -85,6 +88,30 @@ class ArriboServiceTest {
 
         assertThat(resultado.arribos()).hasSize(1);
         assertThat(resultado.lineasQuePasan()).hasSize(4);
+    }
+
+    @Test
+    void cada_consulta_alimenta_el_historial_de_esperas() {
+        given(client.obtenerLineasDeParada(3977L)).willReturn(List.of("62"));
+        given(client.obtenerProximosArribos(eq(3977L), anyList(), anyInt()))
+                .willReturn(List.of(new Arribo("62", "CENTRO", Duration.ofMinutes(4), 900, "CUTCSA", null)));
+
+        service.proximosArribos(3977L);
+
+        verify(puntualidadService).registrar(eq(3977L), anyList());
+    }
+
+    @Test
+    void un_fallo_del_historial_no_le_cuesta_los_arribos_a_nadie() {
+        given(client.obtenerLineasDeParada(3977L)).willReturn(List.of("62"));
+        given(client.obtenerProximosArribos(eq(3977L), anyList(), anyInt()))
+                .willReturn(List.of(new Arribo("62", "CENTRO", Duration.ofMinutes(4), 900, "CUTCSA", null)));
+        org.mockito.BDDMockito.willThrow(new RuntimeException("la base se cayó"))
+                .given(puntualidadService).registrar(anyLong(), anyList());
+
+        final ArribosDeParada resultado = service.proximosArribos(3977L);
+
+        assertThat(resultado.arribos()).hasSize(1);
     }
 
     @Test

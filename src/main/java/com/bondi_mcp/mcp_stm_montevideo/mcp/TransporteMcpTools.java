@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import com.bondi_mcp.mcp_stm_montevideo.client.TransportePublicoException;
 import com.bondi_mcp.mcp_stm_montevideo.domain.ArribosDeParada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Coordenada;
+import com.bondi_mcp.mcp_stm_montevideo.domain.HistorialDeEsperas;
 import com.bondi_mcp.mcp_stm_montevideo.domain.HorariosDeLinea;
 import com.bondi_mcp.mcp_stm_montevideo.domain.Parada;
 import com.bondi_mcp.mcp_stm_montevideo.domain.PronosticoDeLlegada;
@@ -32,6 +33,7 @@ import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
+import com.bondi_mcp.mcp_stm_montevideo.service.PuntualidadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ViajeService;
 
@@ -70,6 +72,7 @@ public class TransporteMcpTools {
     private final BusEnVivoService busEnVivoService;
     private final ConectividadService conectividadService;
     private final EstimadorDeLlegada estimadorDeLlegada;
+    private final PuntualidadService puntualidadService;
 
     @McpTool(name = "buscar_paradas",
             description = """
@@ -696,8 +699,82 @@ public class TransporteMcpTools {
                 + "distancias en línea recta: presentala como guía, no como promesa.";
     }
 
+
+    @McpTool(name = "puntualidad_de_linea",
+            description = """
+                    El historial de esperas REALES observadas de una línea: cuánto falta de \
+                    verdad para el próximo bondi según lo que el tiempo real fue diciendo, \
+                    agregado (mediana, promedio, percentil 90, desglose por franja horaria) y \
+                    comparado contra la espera que promete el horario programado.
+
+                    Usala para preguntas de confiabilidad, no de viaje: "¿la 185 pasa seguido \
+                    de verdad?", "¿qué tan confiable es esta línea de noche?". El dataset se \
+                    construye solo con el uso del sistema: si viene vacío no es un error, es \
+                    que todavía no se juntaron observaciones.""")
+    public RespuestaPuntualidad puntualidadDeLinea(
+            @McpToolParam(description = "Línea de ómnibus, como \"185\" o \"CE1\"", required = true)
+            String linea,
+            @McpToolParam(description = "Código de parada para acotar el historial; opcional",
+                    required = false) Long codigoParada) {
+
+        final HistorialDeEsperas historial = puntualidadService.historialDe(linea, codigoParada);
+        return new RespuestaPuntualidad(Historial.desde(historial), contextoDePuntualidad(historial));
+    }
+
+    private static String contextoDePuntualidad(HistorialDeEsperas historial) {
+        if (historial.sinDatos()) {
+            return "Todavía no hay observaciones de esta línea"
+                    + (historial.codigoParada() != null ? " en esa parada" : "")
+                    + ". El historial se alimenta solo con el uso (cada consulta de arribos y "
+                    + "cada alerta lo nutren): decile al usuario que el dato va a existir en "
+                    + "unos días de uso. NO inventes esperas.";
+        }
+        return """
+                Son esperas OBSERVADAS del tiempo real, no puntualidad estricta por coche. La \
+                mediana es el número para contarle al usuario ("normalmente esperás X min"); el \
+                p90 es la mala suerte ("1 de cada 10 veces, más de Y"). Si hay esperaTeorica, \
+                comparala: observada mucho mayor que teórica = la línea promete más de lo que \
+                cumple. Con pocas observaciones (menos de ~100) presentalo como preliminar.""";
+    }
+
     /** Parada devuelta por la búsqueda. */
     public record ParadaEncontrada(long codigo, String descripcion, Double latitud, Double longitud) {
+    }
+
+    /** El historial agregado de esperas observadas. */
+    public record Historial(String linea, Long codigoParada, long observaciones,
+            String primeraObservacion, String ultimaObservacion, Integer esperaMediaMinutos,
+            Integer esperaMedianaMinutos, Integer esperaP90Minutos, Integer esperaTeoricaMinutos,
+            List<FranjaDeEspera> porFranja) {
+
+        public Historial {
+            porFranja = List.copyOf(porFranja);
+        }
+
+        static Historial desde(HistorialDeEsperas historial) {
+            return new Historial(
+                    historial.linea(),
+                    historial.codigoParada(),
+                    historial.observaciones(),
+                    historial.primeraObservacion() == null ? null : historial.primeraObservacion().toString(),
+                    historial.ultimaObservacion() == null ? null : historial.ultimaObservacion().toString(),
+                    historial.esperaMediaMinutos(),
+                    historial.esperaMedianaMinutos(),
+                    historial.esperaP90Minutos(),
+                    historial.esperaTeoricaMinutos(),
+                    historial.porFranja().stream()
+                            .map(franja -> new FranjaDeEspera(franja.nombre(),
+                                    franja.observaciones(), franja.esperaMediaMinutos()))
+                            .toList());
+        }
+    }
+
+    /** Una franja horaria del historial. */
+    public record FranjaDeEspera(String franja, long observaciones, int esperaMediaMinutos) {
+    }
+
+    /** Resultado de puntualidad_de_linea. */
+    public record RespuestaPuntualidad(Historial historial, String contexto) {
     }
 
     /** El veredicto de llego_a_tiempo, con el desglose minuto a minuto. */

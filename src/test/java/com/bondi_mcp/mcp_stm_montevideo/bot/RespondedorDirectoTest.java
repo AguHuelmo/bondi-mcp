@@ -22,6 +22,7 @@ import com.bondi_mcp.mcp_stm_montevideo.service.ArriboService;
 import com.bondi_mcp.mcp_stm_montevideo.service.BusEnVivoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ConectividadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.EstimadorDeLlegada;
+import com.bondi_mcp.mcp_stm_montevideo.service.PuntualidadService;
 import com.bondi_mcp.mcp_stm_montevideo.service.HorarioTeoricoService;
 import com.bondi_mcp.mcp_stm_montevideo.service.ParadaService;
 import com.bondi_mcp.mcp_stm_montevideo.service.RecorridoService;
@@ -65,6 +66,9 @@ class RespondedorDirectoTest {
 
     @Mock
     private EstimadorDeLlegada estimadorDeLlegada;
+
+    @Mock
+    private PuntualidadService puntualidadService;
 
     @Mock
     private GuardiaDeArribos guardiaDeArribos;
@@ -227,6 +231,21 @@ class RespondedorDirectoTest {
     void llego_con_una_hora_que_ya_paso_no_pronostica() {
         assertThat(respondedor.responder(CHARLA, "llego casa > trabajo 00:00"))
                 .contains("ya pasaron");
+    }
+
+    @Test
+    void puntualidad_resume_las_esperas_observadas() {
+        given(puntualidadService.historialDe("185", 3977L)).willReturn(
+                new com.bondi_mcp.mcp_stm_montevideo.domain.HistorialDeEsperas("185", 3977L, 250,
+                        java.time.LocalDate.of(2026, 7, 1), java.time.LocalDate.of(2026, 7, 19),
+                        7, 6, 15, 5, List.of()));
+
+        final String respuesta = respondedor.responder(CHARLA, "puntualidad 185 3977");
+
+        assertThat(respuesta)
+                .contains("250 observaciones")
+                .contains("6 min")
+                .contains("promete ~5 min");
     }
 
     @Test
