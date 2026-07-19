@@ -1,0 +1,77 @@
+# El stack completo para un VPS: la app, su Postgres y Caddy con HTTPS automático.
+#
+#   cp .env.example .env   →  completar  →  docker compose up -d --build
+#
+# Este compose es para el SERVER. En desarrollo local la filosofía del proyecto sigue igual:
+# la base la levantás vos y la app corre con ./gradlew bootRun.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mcp_stm_montevideo}
+      POSTGRES_USER: ${POSTGRES_USER:-bondi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+    # Sin ports: la base solo se ve desde la red interna del compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bondi} -d ${POSTGRES_DB:-mcp_stm_montevideo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: America/Montevideo
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-mcp_stm_montevideo}
+      POSTGRES_USER: ${POSTGRES_USER:-bondi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+      MONTEVIDEO_CLIENT_ID: ${MONTEVIDEO_CLIENT_ID:?falta MONTEVIDEO_CLIENT_ID en .env}
+      MONTEVIDEO_CLIENT_SECRET: ${MONTEVIDEO_CLIENT_SECRET:?falta MONTEVIDEO_CLIENT_SECRET en .env}
+      # Opcionales: vacíos = esa pata queda apagada, el resto funciona igual.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # El import del GTFS es lo más pesado que hace la app; 768m alcanza holgado.
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx768m"
+    # Sin ports: al mundo solo lo mira Caddy.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?falta DOMINIO en .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - datos-caddy:/data
+      - config-caddy:/config
+
+volumes:
+  datos-postgres:
+  datos-caddy:
+  config-caddy:

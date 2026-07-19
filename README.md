@@ -284,6 +284,12 @@ bot:
 Para pasar del número de prueba a uno real hace falta verificar el negocio en Meta; el código no
 cambia.
 
+## 9. Deploy a un VPS
+
+Todo el sistema en un server chico con HTTPS automático, vía Docker Compose (app + Postgres +
+Caddy). El frontend React viaja compilado dentro del jar, así que en producción todo vive en
+una sola URL. Guía paso a paso en [`deploy/README.md`](deploy/README.md).
+
 ## Guía de prueba: todo lo que hay, superficie por superficie
 
 Cada funcionalidad, para qué sirve y cómo probarla. Todo corre sobre la misma capa de servicio,

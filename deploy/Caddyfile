@@ -1,0 +1,21 @@
+# Proxy con HTTPS automático: con el DNS apuntando al VPS, Caddy consigue y renueva el
+# certificado de Let's Encrypt solo. Es lo que hace posible el webhook de WhatsApp y el
+# MCP remoto sin tocar nada de TLS.
+
+{$DOMINIO} {
+	encode gzip
+	reverse_proxy app:8080
+
+	# --- Opcional: proteger el MCP con un token ---
+	# El endpoint /mcp es público por defecto: cualquiera que conozca la URL puede usar tu
+	# cuota de la Intendencia. Para cerrarlo, descomentá esto, definí MCP_TOKEN en el
+	# environment de caddy en el compose, y en Claude Desktop agregá el header:
+	#   "args": ["-y", "mcp-remote", "https://TU-DOMINIO/mcp",
+	#            "--header", "Authorization: Bearer TU-TOKEN"]
+	#
+	# @mcpSinToken {
+	# 	path /mcp*
+	# 	not header Authorization "Bearer {$MCP_TOKEN}"
+	# }
+	# respond @mcpSinToken 401
+}

@@ -1,0 +1,11 @@
+# Nada de esto tiene que entrar al contexto de build de la imagen.
+
+.git
+.gradle
+build
+frontend/node_modules
+frontend/dist
+
+# CRITICO: aca viven las credenciales locales. En la imagen JAMAS; en el server van por
+# variables de entorno (ver deploy/.env.example).
+config
