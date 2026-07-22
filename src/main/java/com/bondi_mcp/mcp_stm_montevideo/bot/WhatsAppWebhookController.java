@@ -23,10 +23,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * El webhook de WhatsApp: Meta empuja acá cada mensaje que le escriben al número.
@@ -52,7 +52,8 @@ public class WhatsAppWebhookController {
     private final BotProperties properties;
     private final RespondedorDirecto respondedorDirecto;
     private final Mensajero mensajero;
-    private final ObjectMapper objectMapper;
+    /** Boot 4 autoconfigura el {@code JsonMapper} de Jackson 3; no hay bean de {@code ObjectMapper} 2. */
+    private final JsonMapper jsonMapper;
 
     /** Meta reintenta los webhooks sin respuesta 200; este set evita contestar dos veces. */
     private final Set<String> idsAtendidos = Collections.newSetFromMap(
@@ -103,7 +104,7 @@ public class WhatsAppWebhookController {
         }
 
         try {
-            final Notificacion notificacion = objectMapper.readValue(cuerpo, Notificacion.class);
+            final Notificacion notificacion = jsonMapper.readValue(cuerpo, Notificacion.class);
             mensajesDe(notificacion).forEach(this::atender);
         }
         catch (Exception ex) {
@@ -134,17 +135,14 @@ public class WhatsAppWebhookController {
     }
 
     /**
-     * Valida la firma HMAC-SHA256 del cuerpo, si hay app secret configurado.
+     * Valida la firma HMAC-SHA256 del cuerpo contra el app secret de Meta.
      *
-     * <p>Sin app secret se acepta todo (útil para probar), pero queda avisado en el log: sin
-     * firma, cualquiera que descubra la URL puede inyectar mensajes falsos.
+     * <p>Nunca hay un camino que acepte sin firma: el app secret es obligatorio para que la pata
+     * de WhatsApp se considere configurada ({@link BotProperties.Whatsapp#configurado()}), así
+     * que si falta el webhook queda apagado en vez de aceptar cualquier POST.
      */
     private boolean firmaValida(String cuerpo, String firma) {
         final String secreto = properties.whatsapp().appSecret();
-        if (secreto.isBlank()) {
-            log.debug("Webhook de WhatsApp sin app-secret configurado: no se verifica la firma");
-            return true;
-        }
         if (firma == null || !firma.startsWith("sha256=")) {
             return false;
         }

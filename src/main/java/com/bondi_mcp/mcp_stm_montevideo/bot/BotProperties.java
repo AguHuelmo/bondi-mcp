@@ -30,7 +30,10 @@ public record BotProperties(@DefaultValue Telegram telegram, @DefaultValue Whats
      * @param phoneNumberId id del número emisor (no es el número de teléfono)
      * @param verifyToken   secreto que uno inventa y repite al registrar el webhook; Meta lo
      *                      manda en el GET de verificación para probar que el server es nuestro
-     * @param appSecret     opcional; si está, se verifica la firma HMAC de cada webhook entrante
+     * @param appSecret     app secret de Meta, con el que se verifica la firma HMAC de cada
+     *                      webhook entrante. Obligatorio: el webhook es una URL pública, y sin
+     *                      firma cualquiera que la descubra inyecta mensajes en nombre de otro.
+     *                      Si falta, la pata de WhatsApp queda apagada en vez de quedar abierta.
      */
     public record Whatsapp(
             @DefaultValue("") String accessToken,
@@ -40,7 +43,8 @@ public record BotProperties(@DefaultValue Telegram telegram, @DefaultValue Whats
             @DefaultValue("https://graph.facebook.com/v21.0") String baseUrl) {
 
         public boolean configurado() {
-            return !accessToken.isBlank() && !phoneNumberId.isBlank() && !verifyToken.isBlank();
+            return !accessToken.isBlank() && !phoneNumberId.isBlank() && !verifyToken.isBlank()
+                    && !appSecret.isBlank();
         }
     }
 
