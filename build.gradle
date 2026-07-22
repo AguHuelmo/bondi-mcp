@@ -55,4 +55,7 @@ dependencyManagement {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// Gradle no reenvía los -D de la línea de comandos al JVM de los tests. Sin esto, el
+	// -Dtest.integracion=true que documenta McpStmMontevideoApplicationTests no llegaría.
+	systemProperty 'test.integracion', System.getProperty('test.integracion') ?: 'false'
 }

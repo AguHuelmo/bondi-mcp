@@ -12,7 +12,7 @@ Datos de los ómnibus de Montevideo, expuestos de tres formas sobre la misma ló
 Los datos salen de la [API pública de la Intendencia de Montevideo](https://api.montevideo.gub.uy),
 la misma que usa la app *Cómo Ir*.
 
-## Qué hace (v0)
+## Qué hace
 
 | | MCP | REST |
 |---|---|---|
@@ -243,7 +243,7 @@ minutos la línea nunca se acercó, también te lo dice en vez de morir en silen
 memoria: un reinicio las pierde, y volver a pedirla cuesta un mensaje.
 
 **Extra opcional**: con una API key de Anthropic en `bot.claude.api-key`, el bot pasa a modo
-lenguaje natural — Claude decide qué herramienta llamar (las mismas ocho del MCP) y podés
+lenguaje natural — Claude decide qué herramienta llamar (las mismas once del MCP) y podés
 escribirle "¿cuándo pasa la 405 por 18 y Ejido?" como a una persona. Ojo: cada mensaje llama a
 la API de Anthropic y lo pagás vos, así que es para uso propio o demos, no para abrirlo al
 público.
@@ -260,17 +260,18 @@ plantillas que inicia el negocio.
 
 1. Creá una app en <https://developers.facebook.com> y agregale el producto **WhatsApp**. Te dan
    un número de prueba gratis (podés chatear con hasta 5 números que registres).
-2. De la pantalla *API Setup* copiá el **access token** y el **phone number ID**.
-3. Completá `config/application.yaml`:
+2. De la pantalla *API Setup* copiá el **access token** y el **phone number ID**; el **app
+   secret** está en *App settings → Basic*.
+3. Completá `config/application.yaml` (los cuatro valores son obligatorios):
 
-```yaml
-bot:
-  whatsapp:
-    access-token: el-token-de-la-app
-    phone-number-id: "123456789012345"
-    verify-token: un-secreto-que-inventás-vos
-    app-secret: el-app-secret        # opcional: verifica la firma de cada webhook
-```
+   ```yaml
+   bot:
+     whatsapp:
+       access-token: el-token-de-la-app
+       phone-number-id: "123456789012345"
+       verify-token: un-secreto-que-inventás-vos
+       app-secret: el-app-secret
+   ```
 
 4. Exponé la app en HTTPS. En desarrollo alcanza un túnel:
    `cloudflared tunnel --url http://localhost:8080` (o ngrok).
@@ -281,6 +282,10 @@ bot:
    de arriba, ubicación compartida incluida. Las alertas (`avisame 3977 185`) también avisan
    por WhatsApp, al mismo número que las pidió.
 
+> El **app secret** no es opcional: con él se verifica la firma HMAC de cada webhook. Como la URL
+> es pública, sin firma cualquiera que la descubra puede inyectar mensajes haciéndose pasar por
+> otro número. Si falta, la pata de WhatsApp arranca apagada en vez de quedar abierta.
+
 Para pasar del número de prueba a uno real hace falta verificar el negocio en Meta; el código no
 cambia.
 
@@ -289,6 +294,48 @@ cambia.
 Todo el sistema en un server chico con HTTPS automático, vía Docker Compose (app + Postgres +
 Caddy). El frontend React viaja compilado dentro del jar, así que en producción todo vive en
 una sola URL. Guía paso a paso en [`deploy/README.md`](deploy/README.md).
+
+## Antes de publicarlo: acceso y cuota
+
+Cada request gasta cuota de **tu** cuenta de la Intendencia, así que una instancia pública sin
+frenos es una factura ajena. Dos perillas, ambas en `acceso`:
+
+| Propiedad | Variable | Default | Qué hace |
+|---|---|---|---|
+| `acceso.mcp-token` | `MCP_TOKEN` | vacío (abierto) | Con un valor, `/mcp` exige `Authorization: Bearer <token>` |
+| `acceso.limite-por-minuto` | `LIMITE_POR_MINUTO` | `120` | Requests por IP por minuto sobre `/api` y `/mcp`; `0` lo apaga |
+
+En local no hace falta tocar nada: `/mcp` queda abierto y el arranque lo avisa con un `WARN`.
+Para cerrarlo en un server, definí `MCP_TOKEN` y pasale el header a Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "stm-montevideo": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://tu-dominio/mcp",
+               "--header", "Authorization: Bearer TU-TOKEN"]
+    }
+  }
+}
+```
+
+El límite es una ventana fija de un minuto por IP, en memoria. Detrás de Caddy toma la **última**
+entrada de `X-Forwarded-For` —la que agregó el propio proxy—, así que un cliente no se salta el
+tope mandando un header falso. Al pasarse, responde `429` con `Retry-After`.
+
+Lo demás que conviene saber si vas a revisar la seguridad del proyecto:
+
+- **Ningún secreto está versionado.** Los `.example` traen sólo placeholders; el
+  `application.yaml` empaquetado usa `${VAR:}` y nada más.
+- **El webhook de WhatsApp exige el app secret**: verifica la firma HMAC-SHA256 sobre el cuerpo
+  crudo de cada POST, con comparación en tiempo constante. Sin app secret configurado la pata de
+  WhatsApp queda **apagada** — nunca abierta sin verificar.
+- **La base no se expone**: en el compose no tiene `ports`, sólo la ve la red interna.
+- **Ningún error filtra stacktrace**: una caída de la Intendencia sale como `503` con un mensaje
+  propio (`ApiExceptionHandler`).
+- **No hay autenticación de usuarios finales.** No hace falta todavía: no se guarda nada personal
+  del lado del server. Es lo que habría que definir antes de las favoritas sincronizadas.
 
 ## Guía de prueba: todo lo que hay, superficie por superficie
 
@@ -370,23 +417,35 @@ natural (Claude con las mismas tools del MCP). WhatsApp queda siempre en modo co
 ./gradlew test
 ```
 
-Cubren la capa de servicio con la API externa mockeada. El smoke test del contexto completo
-(`McpStmMontevideoApplicationTests`) está `@Disabled` porque necesita Postgres y credenciales
-reales; el javadoc explica cómo correrlo.
+Cubren la capa de servicio con la API externa mockeada, más los filtros de acceso y el webhook de
+WhatsApp (firma HMAC incluida). No necesitan Postgres ni credenciales.
+
+El smoke test del contexto completo levanta la app entera, así que sí las necesita y queda apagado
+salvo que lo pidas:
+
+```bash
+MONTEVIDEO_CLIENT_ID=... MONTEVIDEO_CLIENT_SECRET=... \
+  ./gradlew test --tests '*ApplicationTests' -Dtest.integracion=true
+```
 
 ## Arquitectura
 
 ```
-src/main/java/.../client   -> cliente HTTP a api.montevideo.gub.uy + OAuth2
-src/main/java/.../service  -> lógica de negocio (caché, búsqueda, arribos)
-src/main/java/.../mcp      -> herramientas @McpTool  ─┐ ambas delegan
-src/main/java/.../web      -> controllers REST        ─┘ al mismo service
-src/main/java/.../domain   -> records del dominio
+src/main/java/.../client      -> cliente HTTP a api.montevideo.gub.uy + OAuth2, y el geocoder
+src/main/java/.../service     -> lógica de negocio (caché, búsqueda, arribos, conectividad)
+src/main/java/.../mcp         -> las 11 herramientas @McpTool  ─┐
+src/main/java/.../web         -> controllers REST + filtros     ├─ las tres delegan
+src/main/java/.../bot         -> Telegram, WhatsApp y alertas   ─┘  al mismo service
+src/main/java/.../domain      -> records del dominio (inmutables)
+src/main/java/.../persistence -> entidades JPA y DAOs; no salen de acá
+src/main/java/.../config      -> @ConfigurationProperties
 src/main/resources/db/migration -> migraciones Flyway
-frontend/                  -> React 19 + Vite
+src/main/resources/static     -> demo de conectividad, widget embebible y cartelera
+frontend/                     -> React 19 + Vite
 ```
 
-MCP y REST no duplican lógica: son dos fachadas delgadas sobre las mismas clases de servicio.
+MCP, REST y bot no duplican lógica: son tres fachadas delgadas sobre las mismas clases de
+servicio. Por eso cada funcionalidad aparece en las tres superficies casi sin costo extra.
 
 ### Detalles de la API de la Intendencia que condicionan el diseño
 
@@ -421,11 +480,15 @@ Estos no son caprichos, salen de la [spec real](https://api.montevideo.gub.uy/ap
 
 - **Todavía no se busca por número de línea**, aunque ya se puede: la tabla `parada_linea` tiene
   la relación completa desde que importamos el GTFS. Falta solo exponerlo en la búsqueda.
-- **No hay geocoder.** El catálogo de la Intendencia solo publica transporte y playas, así que no
-  existe forma de convertir una dirección en un punto. El cruce se **estima** a partir de las
-  paradas de cada calle: si la más cercana de una y de la otra están a menos de 250 m, el cruce
-  está entre las dos. Es una heurística: acierta en cruces reales y se abstiene cuando las calles
-  no se tocan, pero no es geocodificación.
+- **Los cruces se estiman, no se geocodifican.** Las direcciones con puerta ("gabriel pereira
+  2470") sí se resuelven de verdad, contra el Servicio Único de Direcciones Geográficas del
+  Uruguay (`direcciones.ide.uy`, abierto y sin credenciales). Pero ese servicio **ignora la
+  segunda calle**: a "Gabriel Pereira y Chucarro" le contesta cualquier punto de Gabriel Pereira.
+  Por eso las esquinas van por otro camino (`EstimadorDeCruce`): se toman las paradas de cada
+  calle y, si la más cercana de una y de la otra están a menos de 250 m, el cruce está entre las
+  dos. Es una heurística: acierta en cruces reales y se abstiene cuando las calles no se tocan.
+- **El geocoder es de otro organismo**, así que puede caerse por su cuenta. Cuando pasa, la
+  búsqueda por texto sobre el caché de paradas sigue funcionando: es un extra, no una dependencia.
 - **Las distancias son en línea recta**, no caminando: la real siempre es algo mayor.
 - **La spec de la Intendencia no refleja la API real.** `upcomingbuses` declara devolver
   `BusLineVariantItem[]`, que no tiene ningún campo de tiempo de arribo, cuando en realidad
@@ -433,14 +496,12 @@ Estos no son caprichos, salen de la [spec real](https://api.montevideo.gub.uy/ap
   `/buses` tampoco coincide con su `VehicleItem`: trae `company` en vez de `companyName`, más
   `eType` y `speed`. Por eso todos los DTO del cliente ignoran campos desconocidos y mapean solo
   lo necesario.
-- Las paradas favoritas tienen su tabla (`V2__paradas_favoritas.sql`) pero todavía no se exponen:
-  falta definir cómo se autentican los usuarios.
-
-## Punto de extensión: posición en tiempo real
-
-La API ya expone la posición en vivo de los buses en `GET /buses?lines=...`, devolviendo
-`VehicleItem` con `location`, `timestamp`, `line`, `origin` y `destination`. No está implementado
-en v0. El lugar para engancharlo está marcado en `TransportePublicoClient`.
+- **Las favoritas del frontend viven en el navegador** (`localStorage`), no en el server: se
+  pierden al cambiar de dispositivo. Guardarlas del lado del server requiere autenticación de
+  usuarios, que no existe todavía.
+- **El rate limiting es por instancia y en memoria.** Alcanza para lo que está pensado —que un
+  script no queme la cuota— pero con varias réplicas cada una lleva su propia cuenta.
+- **Las alertas del bot viven en memoria**: un reinicio las pierde.
 
 ## Problemas comunes
 
