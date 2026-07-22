@@ -74,21 +74,25 @@ Y en el navegador:
     "mcpServers": {
       "stm-montevideo": {
         "command": "npx",
-        "args": ["-y", "mcp-remote", "https://TU-DOMINIO/mcp"]
+        "args": ["-y", "mcp-remote", "https://TU-DOMINIO/mcp",
+                 "--header", "Authorization: Bearer TU-MCP-TOKEN"]
       }
     }
   }
   ```
 
-  ⚠️ `/mcp` y `/api` quedan **públicos**: cualquiera con la URL consume tu cuota de la
-  Intendencia. Para cerrar el MCP con un token hay un bloque comentado en el `Caddyfile`.
+  El header sobra si dejaste `MCP_TOKEN` vacío, pero entonces `/mcp` queda **público** y
+  cualquiera con la URL consume tu cuota de la Intendencia. La app lo avisa con un `WARN` al
+  arrancar. `/api` queda público en cualquier caso: lo que lo protege es
+  `LIMITE_POR_MINUTO` (120 requests por IP por minuto por defecto).
 
 - **Telegram**: nada que configurar además del token en `.env` — el bot hace long polling
   desde el VPS hacia afuera.
 
 - **WhatsApp**: en developers.facebook.com → tu app → WhatsApp → *Configuration*, registrá el
   webhook `https://TU-DOMINIO/webhook/whatsapp` con tu `WHATSAPP_VERIFY_TOKEN` y suscribite al
-  campo **messages**. Con el `.env` completo, listo.
+  campo **messages**. Ojo: hacen falta los **cuatro** `WHATSAPP_*` del `.env`, `APP_SECRET`
+  incluido; sin él la pata de WhatsApp arranca apagada a propósito.
 
 ## 6. Operar
 

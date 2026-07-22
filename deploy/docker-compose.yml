@@ -46,6 +46,9 @@ services:
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Acceso: vacío deja /mcp abierto (la app lo avisa con un WARN al arrancar).
+      MCP_TOKEN: ${MCP_TOKEN:-}
+      LIMITE_POR_MINUTO: ${LIMITE_POR_MINUTO:-120}
       # El import del GTFS es lo más pesado que hace la app; 768m alcanza holgado.
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx768m"
     # Sin ports: al mundo solo lo mira Caddy.

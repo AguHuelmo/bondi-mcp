@@ -52,9 +52,22 @@ montevideo:
 # Necesita una URL HTTPS publica apuntando a /webhook/whatsapp (en desarrollo: cloudflared
 # o ngrok). Pasos completos en el README.
 #
+# Los cuatro valores son obligatorios. El app-secret verifica la firma HMAC de cada webhook: sin
+# el, cualquiera que descubra la URL publica inyecta mensajes haciendose pasar por otro numero,
+# asi que si falta la pata de WhatsApp arranca apagada en vez de quedar abierta.
+#
 # bot:
 #   whatsapp:
 #     access-token: el-token-de-tu-app-de-meta
 #     phone-number-id: "123456789012345"
 #     verify-token: un-secreto-que-inventas-vos
-#     app-secret: el-app-secret-de-la-app   # opcional: verifica la firma de cada webhook
+#     app-secret: el-app-secret-de-la-app
+
+# --- Acceso y cuota (opcional en local) ---
+#
+# Cada request gasta cuota de TU cuenta de la Intendencia. En local no hace falta tocar nada:
+# /mcp queda abierto y el arranque lo avisa por log. Antes de publicar el server, ver el README.
+#
+# acceso:
+#   mcp-token: un-token-largo-que-inventas-vos   # vacio = /mcp abierto
+#   limite-por-minuto: 120                       # requests por IP sobre /api y /mcp; 0 lo apaga

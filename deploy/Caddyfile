@@ -6,16 +6,10 @@
 	encode gzip
 	reverse_proxy app:8080
 
-	# --- Opcional: proteger el MCP con un token ---
-	# El endpoint /mcp es público por defecto: cualquiera que conozca la URL puede usar tu
-	# cuota de la Intendencia. Para cerrarlo, descomentá esto, definí MCP_TOKEN en el
-	# environment de caddy en el compose, y en Claude Desktop agregá el header:
-	#   "args": ["-y", "mcp-remote", "https://TU-DOMINIO/mcp",
-	#            "--header", "Authorization: Bearer TU-TOKEN"]
+	# El token del /mcp y el límite de requests los aplica la app, no Caddy: así valen
+	# también corriendo sin proxy. Se configuran con MCP_TOKEN y LIMITE_POR_MINUTO en el
+	# .env; ver la sección "Antes de publicarlo" del README principal.
 	#
-	# @mcpSinToken {
-	# 	path /mcp*
-	# 	not header Authorization "Bearer {$MCP_TOKEN}"
-	# }
-	# respond @mcpSinToken 401
+	# Caddy sí es imprescindible para una cosa acá: agrega la IP real del cliente al final
+	# de X-Forwarded-For, que es de donde el limitador saca a quién contarle el request.
 }
